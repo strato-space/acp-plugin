@@ -31,7 +31,7 @@ CLI.
 From the repo root:
 
 ```bash
-cd /home/tools/acp/Nexus-acp
+cd /home/tools/acp-plugin
 npm ci
 npm run package
 
@@ -62,7 +62,7 @@ via a UNIX socket. If the CLI can't find the right socket, you'll see errors lik
 The most reliable approach is to try all sockets until one responds:
 
 ```bash
-VSIX=/home/tools/acp/Nexus-acp/acp-plugin-<version>.vsix
+VSIX=/home/tools/acp-plugin/acp-plugin-<version>.vsix
 
 for s in /run/user/$(id -u)/vscode-ipc-*.sock; do
   echo "Trying $s"
