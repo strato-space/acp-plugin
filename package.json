@@ -1,0 +1,344 @@
+{
+  "name": "acp-plugin",
+  "displayName": "ACP — Agent Communication Protocol",
+  "description": "ACP client for VS Code. Chat with Agent Client Protocol (ACP) compatible coding agents directly in your editor.",
+  "version": "0.1.20",
+  "license": "Apache-2.0",
+  "publisher": "strato-space",
+  "icon": "assets/icon.png",
+  "preview": true,
+  "pricing": "Free",
+  "qna": "marketplace",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cosmos-vibe/Nexus-acp.git"
+  },
+  "engines": {
+    "vscode": "^1.74.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "opencode",
+    "acp",
+    "agent",
+    "chat",
+    "copilot",
+    "coding assistant",
+    "llm"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The extension can run in untrusted workspaces but some features may be limited."
+    },
+    "virtualWorkspaces": true
+  },
+  "activationEvents": [
+    "onView:acp.welcomeView"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "acp.focusChat",
+        "title": "ACP",
+        "category": "ACP",
+        "icon": {
+          "light": "assets/icon.png",
+          "dark": "assets/icon.png"
+        }
+      },
+      {
+        "command": "acp.startChat",
+        "title": "Start Chat",
+        "category": "ACP",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "acp.newChat",
+        "title": "New Chat",
+        "category": "ACP",
+        "icon": "$(add)"
+      },
+      {
+        "command": "acp.clearChat",
+        "title": "Clear Chat",
+        "category": "ACP",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "acp.newChatWindow",
+        "title": "New Chat Window",
+        "category": "ACP",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "acp.attachSelection",
+        "title": "Send to ACP Chat",
+        "category": "ACP",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "acp.attachFile",
+        "title": "Send to ACP Chat",
+        "category": "ACP",
+        "icon": "$(comment-discussion)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "acp",
+          "title": "ACP — Agent Communication Protocol",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "acp": [
+        {
+          "type": "tree",
+          "id": "acp.welcomeView",
+          "name": "Open Chat"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "acp.welcomeView",
+        "contents": "Open ACP Chat in the editor.\n[Open Chat](command:acp.startChat)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "acp.startChat",
+          "when": "view == acp.welcomeView",
+          "group": "navigation@0"
+        },
+        {
+          "command": "acp.newChatWindow",
+          "when": "view == acp.welcomeView",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "acp.focusChat",
+          "group": "navigation@-1"
+        },
+        {
+          "command": "acp.newChatWindow",
+          "when": "activeWebviewPanelId == acp.chatPanel",
+          "group": "navigation@0"
+        },
+        {
+          "command": "acp.newChat",
+          "when": "activeWebviewPanelId == acp.chatPanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "acp.clearChat",
+          "when": "activeWebviewPanelId == acp.chatPanel",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "acp.startChat",
+          "when": "true"
+        },
+        {
+          "command": "acp.newChat",
+          "when": "true"
+        },
+        {
+          "command": "acp.clearChat",
+          "when": "true"
+        },
+        {
+          "command": "acp.newChatWindow",
+          "when": "true"
+        },
+        {
+          "command": "acp.attachSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "acp.attachFile",
+          "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "acp.attachSelection",
+          "when": "editorHasSelection",
+          "group": "9_cutcopypaste@100"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "acp.attachFile",
+          "when": "!explorerResourceIsFolder",
+          "group": "7_modification@100"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ACP — Agent Communication Protocol",
+      "properties": {
+        "acp.includeBuiltInAgents": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include built-in agents (OpenCode, Claude Code, Codex, Gemini) in the agent selector."
+        },
+        "acp.agentServers": {
+          "type": "object",
+          "default": {},
+          "description": "Custom ACP agents (externalized settings, similar to Zed's agent_servers). Keys are agent ids; values describe how to start the agent.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "command"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Optional type hint (currently informational).",
+                "default": "custom"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name in the agent selector (defaults to the key)."
+              },
+              "command": {
+                "type": "string",
+                "description": "Executable to run (resolved from PATH). Supports ${workspaceFolder}, ${userHome}, ${env:NAME}."
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments to pass to the executable.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the agent process. Supports ${workspaceFolder}, ${userHome}, ${env:NAME}."
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables merged over the extension host environment.",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "acp.connectTimeoutMs": {
+          "type": "number",
+          "default": 600000,
+          "minimum": 1000,
+          "description": "Max time to wait for ACP initialize() when connecting to an agent (ms). If exceeded, the agent process is killed and an error is shown."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run build:webview && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "build:webview": "cd src/views/webview && npx vite build",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "watch:webview": "cd src/views/webview && npx vite build --watch",
+    "package": "npm run check-types && npm run build:webview && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "pretest": "npm run compile-tests && npm run compile",
+    "test": "node scripts/run-vscode-test.mjs",
+    "precoverage": "npm run compile-tests && npm run compile",
+    "coverage": "vscode-test --coverage --coverage-output coverage --coverage-reporter lcov --coverage-reporter text",
+    "coverage:html": "vscode-test --coverage --coverage-reporter html",
+    "lint": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"*.{json,md}\"",
+    "prepare": "husky",
+    "screenshot": "npx tsx scripts/screenshot.ts",
+    "pretest:e2e": "npm run compile",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
+    "@playwright/test": "^1.57.0",
+    "@types/jsdom": "^27.0.0",
+    "@types/marked": "^5.0.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "18.x",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.0.0",
+    "autoprefixer": "^10.4.23",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "jsdom": "^27.3.0",
+    "lint-staged": "^16.2.7",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.6",
+    "prettier": "^3.7.4",
+    "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.4.1"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.12.0",
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-use-controllable-state": "^1.2.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.522.0",
+    "marked": "^17.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-sanitize": "^6.0.0",
+    "tailwind-merge": "^3.3.1",
+    "vscode-jsonrpc": "^8.2.0",
+    "zustand": "^5.0.4"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,html}": [
+      "prettier --write"
+    ]
+  }
+}
