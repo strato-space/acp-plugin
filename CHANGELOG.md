@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 (2026-02-09)
+
+
+### Features
+
+* ACP VS Code plugin (extracted from Nexus-acp) ([b82a28f](https://github.com/strato-space/acp-plugin/commit/b82a28fd99dea0257dd0c801a7bcf0b276e6678a))
+
 ## 0.1.8 (2026-02-07)
 
 ### Breaking Changes
