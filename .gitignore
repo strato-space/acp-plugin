@@ -8,12 +8,17 @@ coverage/
 test-results/
 playwright-report/
 
+# Editor / agent tooling (local-only)
+.cursor/
+.hive/
+.homer/
+.opencode/
+.vscode/
+.husky/
+
 # Local-only agent notes (keep repository guidelines in AGENTS.md tracked)
 @AGENTS.md
 mise.toml
-
-# Workspace-specific settings (often machine/user-specific)
-.vscode/settings.json
 
 # QDM - User specific
 _sdd/_user/
