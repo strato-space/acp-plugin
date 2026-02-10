@@ -1,59 +1,103 @@
-# ACP | Agent Client Protocol (VS Code)
+# ACP Plugin Monorepo (VS Code + Web)
 
-> AI coding agents in VS Code via the Agent Client Protocol (ACP).
-
-ACP Plugin lets you chat with ACP-compatible coding agents directly in your editor. It can auto-detect common agents on your `PATH` and also supports custom agent definitions via settings (similar to Zed's `agent_servers`).
+ACP Plugin is a VS Code extension and a standalone web UI for running ACP (Agent Client Protocol) agents.
 
 ![ACP Screenshot](assets/acp-sidebar.png)
 
-## Features
+## What’s In Here
 
-- **Multi-agent support** (built-in + custom)
-- **Native chat UI** with streaming responses
-- **Multi-tab chat** sessions
-- **Execution details** block: **Input → Reasoning → Calls → Output**
-- **Tool visibility** with expandable **Input** and **Output**
-- **Stop + queued follow-ups** while an agent is running
-- **Icon-only Reload** button to refresh the ACP webview without reloading VS Code
-- **Rich Markdown** + syntax highlighting
-- **ANSI output rendering**
-- **File & code attachments**
+- VS Code extension (entrypoint: `src/extension.ts`)
+- Shared React UI package: `packages/acp-ui/` (used by both the extension webview and `acp-chat`)
+- Standalone web app + server bridge: `acp-chat/`
 
-## Installation
+## VS Code Extension
 
-This milestone focuses on a rebrand + UI/bugfixes and is typically installed via a VSIX artifact.
-
-1. In VS Code: Extensions view → `...` → **Install from VSIX...**
-2. Or via CLI:
+### Dev
 
 ```bash
-code --install-extension /path/to/acp-plugin.vsix --force
+cd /home/tools/acp-plugin
+npm ci
+npm run watch
 ```
 
-## Requirements
+Then use **Run Extension** from `.vscode/launch.json`.
 
-Install at least one ACP-compatible agent and ensure it is on your `PATH`:
+### Package (VSIX)
 
-- **Claude Code**: `npm install -g @anthropic-ai/claude-code`
-- **OpenCode**: `npm install -g opencode`
-- **Codex CLI**: install your preferred Codex CLI build
-- **Gemini CLI**: `npm install -g @google/gemini-cli`
+```bash
+cd /home/tools/acp-plugin
+npm ci
+npm run package
+npx vsce package --no-dependencies
 
-## Usage
+# Install locally
+code --install-extension ./acp-plugin-<version>.vsix --force
+```
 
-1. Click the **ACP** icon in the Activity Bar
-2. Or run **`ACP: Start Chat`** from the Command Palette
-3. Select an agent in the dropdown and start chatting
+Remote-SSH install (try all VS Code Server sockets):
 
-### Add Your Own Agent
+```bash
+VSIX=/home/tools/acp-plugin/acp-plugin-<version>.vsix
 
-Add a custom agent definition in VS Code settings (User or Workspace):
+for s in /run/user/$(id -u)/vscode-ipc-*.sock; do
+  echo "Trying $s"
+  VSCODE_IPC_HOOK_CLI="$s" code --install-extension "$VSIX" --force && break
+done
+```
+
+## Web UI (`acp-chat`)
+
+`acp-chat` serves a browser UI and a WebSocket bridge that spawns an ACP agent per connection.
+
+### Run Locally
+
+```bash
+cd /home/tools/acp-plugin/acp-chat
+npm ci
+npm run build
+
+ACP_CHAT_HOST=127.0.0.1 ACP_CHAT_PORT=8732 ACP_CHAT_AUTH_TOKEN=devtoken \
+  npm run start
+```
+
+Open:
+
+- `http://127.0.0.1:8732/?token=devtoken`
+
+### Hosted Dev (agents-dev)
+
+- Base URL: `https://agents-dev.stratospace.fun`
+- Auth: append `?token=<ACP_CHAT_AUTH_TOKEN>` (or use `Authorization: Bearer <token>` for `/ws`)
+
+### Deploy (nginx + systemd)
+
+Templates live in:
+
+- `acp-chat/deploy/nginx/agents-dev.conf`
+- `acp-chat/deploy/systemd/acp-chat.service`
+
+Runtime env vars used by the server:
+
+- `ACP_CHAT_HOST` (default `127.0.0.1`)
+- `ACP_CHAT_PORT` (default `8732`)
+- `ACP_CHAT_AUTH_TOKEN` (recommended; requires `?token=...` or `Authorization: Bearer ...`)
+- `ACP_CONNECT_TIMEOUT_MS` (default `600000`)
+- `ACP_APP_VERSION` / `ACP_CHAT_VERSION` (optional override; otherwise uses repo `package.json` version)
+
+## Agent Configuration
+
+Both the extension and `acp-chat` read agent configs from VS Code settings:
+
+- `acp.agentServers`
+- `acp.includeBuiltInAgents`
+- `acp.connectTimeoutMs`
+
+Example:
 
 ```jsonc
 {
   "acp.agentServers": {
     "stratoproject": {
-      "type": "custom",
       "name": "StratoProject",
       "command": "uv",
       "args": [
@@ -62,29 +106,45 @@ Add a custom agent definition in VS Code settings (User or Workspace):
         "run",
         "StratoProject.py",
         "--transport",
-        "acp",
+        "acp"
       ],
-      "env": {
-        "PYTHONUNBUFFERED": "1",
-      },
-    },
-  },
+      "env": { "PYTHONUNBUFFERED": "1" }
+    }
+  }
 }
 ```
 
-If you want to hide the built-in agents:
+Notes:
 
-```jsonc
-{ "acp.includeBuiltInAgents": false }
+- Built-ins include `opencode`, `claude-code` (via `npx @zed-industries/claude-code-acp`), `codex`, `gemini`.
+- Custom agents using `--transport acp` automatically get `--watch` appended (AgentCard hot reload).
+
+## Tests
+
+Extension host tests:
+
+```bash
+cd /home/tools/acp-plugin
+npm test
 ```
 
-### Connection Timeout
+Playwright smoke (agents-dev web):
 
-If an agent takes a long time to start/initialize, increase:
-
-```jsonc
-{ "acp.connectTimeoutMs": 600000 }
+```bash
+cd /home/tools/acp-plugin
+ACP_AGENTS_DEV_TOKEN=... npm run test:e2e
 ```
+
+Optional: VS Code smoke (Electron):
+
+```bash
+cd /home/tools/acp-plugin
+ACP_E2E_RUN_VSCODE=1 npm run test:e2e
+```
+
+Manual MCP runbook (for LLM-driven UI checks):
+
+- `e2e/mode-b-mcp.md`
 
 ## License
 

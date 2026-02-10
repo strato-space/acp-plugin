@@ -5,7 +5,10 @@ playwright-report/**
 test-results/**
 coverage/**
 scripts/**
+plan/**
 screenshots/**
+acp-chat/**
+packages/**
 src/**
 out/**
 !out/webview/**

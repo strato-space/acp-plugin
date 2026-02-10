@@ -7,6 +7,11 @@ out
 coverage/
 test-results/
 playwright-report/
+screenshots/
+.env
+.env.*
+!.env.example
+*.swp
 
 # Editor / agent tooling (local-only)
 .cursor/

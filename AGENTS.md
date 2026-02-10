@@ -3,12 +3,14 @@
 ## Project Structure
 
 - `src/`: VS Code extension host (TypeScript). Entry point: `src/extension.ts`.
-- `src/views/webview/`: React + Vite webview UI bundled into the extension.
+- `src/views/webview/`: React + Vite webview entry (bundled into the extension).
+- `packages/acp-ui/`: shared React UI + Zustand store + types (used by both the webview and `acp-chat`).
+- `acp-chat/`: standalone web UI + server bridge (Express + WS) for `agents-dev.stratospace.fun`.
 - `src/test/`: extension tests (`*.test.ts`) executed in an Extension Host.
 - `e2e/`: Playwright E2E tests (`*.spec.ts`).
 - `assets/`, `media/`, `screenshots/`: images used in the UI/README/marketplace.
 - Generated (do not commit): `dist/`, `out/`, `coverage/`, `*.vsix`, `playwright-report/`,
-  `test-results/`.
+  `test-results/`, `acp-chat/**/dist/`.
 
 ## Build and Development Commands
 
@@ -17,6 +19,7 @@
 - `npm run compile`: one-off build (typecheck + webview build + bundle).
 - `npm run package`: production build (used by `vsce` packaging).
 - `npx vsce package --no-dependencies`: create a `.vsix` for manual install/testing.
+- `cd acp-chat && npm ci && npm run build`: build the standalone web UI + server bridge.
 
 Tip: In VS Code, use the "Run Extension" and "Extension Tests" launch configs
 (`.vscode/launch.json`).
@@ -110,6 +113,15 @@ code --uninstall-extension cosmosjeon.nexus-acp
 - Coverage: `npm run coverage` writes reports to `coverage/` (CI uploads + summarizes this).
 - E2E: Playwright tests live in `e2e/*.spec.ts` and run via `npm run test:e2e` (use
   `test:e2e:headed` / `test:e2e:debug` when debugging).
+- E2E env:
+- `ACP_AGENTS_DEV_TOKEN`: required for the agents-dev smoke tests.
+- `ACP_AGENTS_DEV_BASE_URL`: override base URL (default `https://agents-dev.stratospace.fun`).
+- `ACP_E2E_RUN_VSCODE=1`: opt-in to the VS Code Electron smoke test (Mode B).
+- `PW_CHROME_CHANNEL=chrome`: optional, to force system Chrome instead of bundled Chromium.
+
+Manual MCP smoke runbook (LLM-driven UI checks):
+
+- `e2e/mode-b-mcp.md`
 
 ## Security & Configuration Tips
 

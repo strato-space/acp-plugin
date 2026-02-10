@@ -1,0 +1,17 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.fast-agent/
+**/.fast-agent/
+.claude/
+**/.claude/
+.cursor/
+.github/
+.hive/
+.homer/
+.husky/
+.opencode/
+.vscode/
+.env
+.env.*

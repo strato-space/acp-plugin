@@ -1,0 +1,18 @@
+[Unit]
+Description=acp-chat (ACP web UI + WS bridge)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/tools/acp-plugin/acp-chat
+Environment=NODE_ENV=production
+Environment=ACP_CHAT_HOST=127.0.0.1
+Environment=ACP_CHAT_PORT=8732
+# Set a real secret on the host:
+# Environment=ACP_CHAT_AUTH_TOKEN=...
+ExecStart=/usr/bin/npm --silent run start
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

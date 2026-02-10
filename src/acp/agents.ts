@@ -44,25 +44,41 @@ export const AGENTS: AgentConfig[] = [
     id: "claude-code",
     name: "Claude Code",
     command: "npx",
-    args: ["@zed-industries/claude-code-acp"],
+    args: ["--yes", "@zed-industries/claude-code-acp"],
   },
   {
     id: "codex",
     name: "Codex CLI",
     command: "npx",
-    args: ["@zed-industries/codex-acp"],
+    args: ["--yes", "@zed-industries/codex-acp"],
   },
   {
     id: "gemini",
     name: "Gemini CLI",
     command: "npx",
-    args: ["@google/gemini-cli", "--experimental-acp"],
+    args: ["--yes", "@google/gemini-cli", "--experimental-acp"],
   },
 ];
 
 // Externalized agent settings (VS Code config) are pushed into this module by the extension.
 let includeBuiltins = true;
 let customAgents: AgentConfig[] = [];
+
+function hasTransportAcp(args: string[]): boolean {
+  const idx = args.indexOf("--transport");
+  if (idx === -1) return false;
+  const next = args[idx + 1];
+  return typeof next === "string" && next.toLowerCase() === "acp";
+}
+
+function ensureWatch(agent: AgentConfig): AgentConfig {
+  // fast-agent supports `--watch` to reload AgentCard changes.
+  // Only apply it to ACP transports (custom agents) to avoid surprising behavior.
+  const args = Array.isArray(agent.args) ? agent.args : [];
+  if (!hasTransportAcp(args)) return agent;
+  if (args.includes("--watch")) return agent;
+  return { ...agent, args: [...args, "--watch"] };
+}
 
 /**
  * Apply user-configured agents (from VS Code settings).
@@ -86,7 +102,7 @@ function getEffectiveAgents(): AgentConfig[] {
     for (const agent of AGENTS) merged.set(agent.id, agent);
   }
 
-  for (const agent of customAgents) merged.set(agent.id, agent);
+  for (const agent of customAgents) merged.set(agent.id, ensureWatch(agent));
 
   return [...merged.values()];
 }

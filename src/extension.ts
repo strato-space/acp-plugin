@@ -190,6 +190,9 @@ type ExternalSettingsLoadResult = {
 function tryLoadExternalSettings(): ExternalSettingsLoadResult {
   const candidates = [
     path.join(os.homedir(), ".vscode", "settings.json"),
+    // Remote-SSH / server-side VS Code settings.
+    path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
+    path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
     // Common shared workspace setup in this environment.
     "/home/.vscode/settings.json",
     "/home/strato-space/.vscode/settings.json",
@@ -419,15 +422,41 @@ function applyAgentSettings(): void {
     const command = raw.command;
     if (!command || typeof command !== "string") continue;
 
-    const args: string[] = Array.isArray(raw.args)
+    const rawArgs: string[] = Array.isArray(raw.args)
       ? raw.args.filter((a): a is string => typeof a === "string")
       : [];
+
+    const expandedArgs = rawArgs.map(expandVars);
+
+    const hasTransportAcp = (argv: string[]) => {
+      for (let i = 0; i < argv.length; i++) {
+        const a = argv[i];
+        if (a === "--transport") {
+          const next = argv[i + 1];
+          if (typeof next === "string" && next.toLowerCase() === "acp") return true;
+        }
+        const lower = a.toLowerCase();
+        if (lower.startsWith("--transport=")) {
+          const value = lower.slice("--transport=".length);
+          if (value === "acp") return true;
+        }
+      }
+      return false;
+    };
+
+    const ensureWatch = (argv: string[]) => {
+      // fast-agent supports `--watch` to reload AgentCard changes dynamically.
+      // Only apply it when the agent explicitly uses ACP transport.
+      if (!hasTransportAcp(argv)) return argv;
+      if (argv.includes("--watch")) return argv;
+      return [...argv, "--watch"];
+    };
 
     agents.push({
       id,
       name: raw.name && typeof raw.name === "string" ? raw.name : id,
       command: expandVars(command),
-      args: args.map(expandVars),
+      args: ensureWatch(expandedArgs),
       cwd: raw.cwd ? expandVars(raw.cwd) : undefined,
       env: raw.env,
     });

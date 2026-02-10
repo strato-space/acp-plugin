@@ -74,7 +74,7 @@ async function takeScreenshot() {
     const modifier = cmdOrCtrl();
     await window.keyboard.press(`${modifier}+Shift+P`);
     await window.waitForTimeout(TIMING.COMMAND_PALETTE_OPEN);
-    await window.keyboard.type("View: Focus on Chat View");
+    await window.keyboard.type("ACP: Start Chat");
     await window.waitForTimeout(TIMING.COMMAND_TYPE);
     await window.keyboard.press("Enter");
     await window.waitForTimeout(TIMING.COMMAND_EXECUTE);

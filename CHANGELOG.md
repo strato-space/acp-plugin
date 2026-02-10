@@ -112,11 +112,31 @@
 
 ### UI
 
-- Hierarchy: add a `Line | Frame` toggle (default: **Line**) to reduce deep nesting noise.
-- IO frames: Input/Output blocks now respect the same hierarchy style as tools/agents.
+- Monorepo UI: extract the shared React UI + Zustand store + types into `packages/acp-ui` and reuse it for both the VS Code webview and `acp-chat`.
+- Hierarchy: default to **Frame**. The `Line | Frame` selector is temporarily hidden in Settings (kept in code for later iteration).
+- IO frames: Input/Output blocks use the same hierarchy style as tools/agents.
 
 ### Fixes
 
 - Multi-panel: isolate agent/mode/model selections and session history per ACP panel (no cross-panel message leakage).
 - Streaming: ignore late tool updates after stream end (prevents a duplicate StratoProject frame getting stuck in `Running`).
 - Tools: show tool output even when the agent only provides it on `tool_call` (start) rather than `tool_call_update` (Codex CLI `Read ...`).
+- acp-chat: report the monorepo version in the UI (e.g. `ACP v0.1.20`) instead of a service name.
+- acp-chat: do not overwrite client-side sessions with an empty server list (sessions are local in the web service for now).
+
+## 0.1.21 (2026-02-10)
+
+### Fixes
+
+- acp-chat: fix production crash caused by duplicate React copies by deduping `react`/`react-dom` in Vite config.
+- acp-chat: bump the fallback `appInfo.version` to match the monorepo release version.
+
+### Tests
+
+- E2E: add Playwright smoke tests for agents-dev (Mode A) and VS Code (Mode B, opt-in via `ACP_E2E_RUN_VSCODE=1`).
+- E2E: move Playwright `testDir` to `e2e/` and make the Chrome channel optional (`PW_CHROME_CHANNEL`).
+
+### Docs
+
+- README: rewrite monorepo docs (extension + `acp-chat` + dev/build/test workflows).
+- Add a text-based MCP smoke runbook for Mode B (`e2e/mode-b-mcp.md`).

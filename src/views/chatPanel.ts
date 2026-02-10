@@ -15,6 +15,12 @@ const PANEL_STORAGE_PREFIX = "acp.panels";
 const panelStorageKey = (panelKey: string, key: string) =>
   `${PANEL_STORAGE_PREFIX}.${panelKey}.${key}`;
 
+// Persist the last selection globally (not panel-scoped) so new panels can
+// auto-select a sensible default without leaking messages/sessions between tabs.
+const LAST_SELECTED_AGENT_STORAGE_KEY = "acp.lastSelectedAgent";
+const LAST_SELECTED_MODE_STORAGE_KEY = "acp.lastSelectedMode";
+const LAST_SELECTED_MODEL_STORAGE_KEY = "acp.lastSelectedModel";
+
 interface StoredMessage {
   id: string;
   type: "user" | "assistant" | "error" | "system";
@@ -207,10 +213,21 @@ export class ChatPanelManager {
     const savedAgentId = this.globalState.get<string>(
       panelStorageKey(panelKey, SELECTED_AGENT_STORAGE_KEY)
     );
-    if (savedAgentId) {
-      const agent = getAgent(savedAgentId);
+    const globalLastAgentId = this.globalState.get<string>(
+      LAST_SELECTED_AGENT_STORAGE_KEY
+    );
+    const preferredAgentId = savedAgentId || globalLastAgentId;
+    if (preferredAgentId) {
+      const agent = getAgent(preferredAgentId);
       if (agent) {
         acpClient.setAgent(agent);
+        // Seed the panel-scoped key for consistency (this panelKey is ephemeral anyway).
+        this.globalState.update(
+          panelStorageKey(panelKey, SELECTED_AGENT_STORAGE_KEY),
+          preferredAgentId
+        );
+      } else {
+        acpClient.setAgent(getFirstAvailableAgent());
       }
     } else {
       acpClient.setAgent(getFirstAvailableAgent());
@@ -313,17 +330,74 @@ export class ChatPanelManager {
             }
             break;
           case "ready":
-            this.postMessageToPanel(panelId, {
-              type: "connectionState",
-              state: ctx.acpClient.getState(),
-            });
-            this.postMessageToPanel(panelId, {
-              type: "appInfo",
-              version: this.appVersion,
-            });
-            this.postAgents(panelId);
-            this.sendSessionMetadata(panelId);
-            this.sendStoredSessions(panelId);
+            {
+              const requestedAgentId =
+                typeof message.agentId === "string"
+                  ? message.agentId.trim()
+                  : "";
+              const requestedModeId =
+                typeof message.modeId === "string" ? message.modeId.trim() : "";
+              const requestedModelId =
+                typeof message.modelId === "string"
+                  ? message.modelId.trim()
+                  : "";
+
+              // Publish current state immediately.
+              this.postMessageToPanel(panelId, {
+                type: "connectionState",
+                state: ctx.acpClient.getState(),
+              });
+              this.postMessageToPanel(panelId, {
+                type: "appInfo",
+                version: this.appVersion,
+              });
+
+              // Apply client-preferred selections (from restored webview state) if valid.
+              if (requestedAgentId) {
+                const agent = getAgent(requestedAgentId);
+                if (agent) {
+                  ctx.acpClient.setAgent(agent);
+                  ctx.hasSession = false;
+                  ctx.hasRestoredModeModel = false;
+                  this.globalState.update(
+                    panelStorageKey(ctx.panelKey, SELECTED_AGENT_STORAGE_KEY),
+                    requestedAgentId
+                  );
+                  this.globalState.update(
+                    LAST_SELECTED_AGENT_STORAGE_KEY,
+                    requestedAgentId
+                  );
+                }
+              }
+
+              if (requestedModeId) {
+                this.globalState.update(
+                  panelStorageKey(ctx.panelKey, SELECTED_MODE_STORAGE_KEY),
+                  requestedModeId
+                );
+                this.globalState.update(LAST_SELECTED_MODE_STORAGE_KEY, requestedModeId);
+                ctx.hasRestoredModeModel = false;
+              }
+
+              if (requestedModelId) {
+                this.globalState.update(
+                  panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
+                  requestedModelId
+                );
+                this.globalState.update(
+                  LAST_SELECTED_MODEL_STORAGE_KEY,
+                  requestedModelId
+                );
+                ctx.hasRestoredModeModel = false;
+              }
+
+              this.postAgents(panelId);
+              this.sendSessionMetadata(panelId);
+              this.sendStoredSessions(panelId);
+
+              // Auto-connect on load to the selected agent (idempotent).
+              await this.handleConnect(panelId);
+            }
             break;
           case "saveSession":
             if (message.session) {
@@ -959,6 +1033,7 @@ export class ChatPanelManager {
         panelStorageKey(ctx.panelKey, SELECTED_AGENT_STORAGE_KEY),
         agentId
       );
+      this.globalState.update(LAST_SELECTED_AGENT_STORAGE_KEY, agentId);
       ctx.hasSession = false;
       ctx.hasRestoredModeModel = false;
       this.postMessageToPanel(panelId, { type: "agentChanged", agentId });
@@ -1034,6 +1109,7 @@ export class ChatPanelManager {
         panelStorageKey(ctx.panelKey, SELECTED_MODE_STORAGE_KEY),
         modeId
       );
+      await this.globalState.update(LAST_SELECTED_MODE_STORAGE_KEY, modeId);
       this.sendSessionMetadata(panelId);
     } catch (error) {
       console.error(`[Chat:${panelId}] Failed to set mode:`, error);
@@ -1053,6 +1129,7 @@ export class ChatPanelManager {
         panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
         modelId
       );
+      await this.globalState.update(LAST_SELECTED_MODEL_STORAGE_KEY, modelId);
       this.sendSessionMetadata(panelId);
     } catch (error) {
       console.error(`[Chat:${panelId}] Failed to set model:`, error);
