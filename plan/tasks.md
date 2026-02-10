@@ -11,8 +11,8 @@ This file tracks the main tasks done as part of the `0.1.21` release work.
 - [x] Add a text-only MCP smoke runbook for agents-dev UI verification: `e2e/mode-b-mcp.md`.
 - [x] Update docs: `README.md`, `AGENTS.md`, `CHANGELOG.md`.
 - [x] Bump version to `0.1.21` and package `acp-plugin-0.1.21.vsix`.
+- [x] Create GitHub tag + release for `v0.1.21` and upload the `.vsix` as a release asset.
 
 ## Pending
 
 - [ ] Install `acp-plugin-0.1.21.vsix` on the local VS Code instance (not possible from this remote host without the local `code` CLI).
-- [ ] Create GitHub tag + release for `v0.1.21` and upload the `.vsix` as a release asset.
