@@ -1,0 +1,22 @@
+{
+  // VS Code / TypeScript language service config for Playwright E2E sources.
+  //
+  // The repo root `tsconfig.json` intentionally only includes `src/**/*` so it
+  // doesn't compile E2E tests as part of `npm test`.
+  //
+  // Without a local tsconfig, VS Code opens `e2e/*.ts` under an "inferred"
+  // project, which often misses Node's built-in module typings (fs/path/etc).
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}
+
