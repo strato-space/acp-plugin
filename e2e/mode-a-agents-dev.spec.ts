@@ -51,10 +51,13 @@ test.describe("Mode A: agents-dev web smoke", () => {
     });
     await page.keyboard.press("Escape");
 
-    await input.fill("ping");
+    // Make the assertion deterministic: some agents may interpret "ping" as a
+    // request to run the system ping command instead of replying "pong".
+    await input.fill('Reply with exactly the single word "pong". Do not use tools.');
     await input.press("Enter");
 
-    await expect(page.getByText(/pong/i)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("pong", { exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
   });
 });
-

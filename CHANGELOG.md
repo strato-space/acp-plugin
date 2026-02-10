@@ -150,3 +150,17 @@ Upstream attribution / prior art:
 
 - README: rewrite monorepo docs (extension + `acp-chat` + dev/build/test workflows).
 - Add a text-based MCP smoke runbook for Mode B (`e2e/mode-b-mcp.md`).
+
+## 0.1.22 (2026-02-10)
+
+### Features
+
+- Config: support Zed-compatible `agent_servers` settings (including `assistant.agent_servers`) and add `acp.agent_servers` alias.
+
+### Docs
+
+- README: document fork rationale and upstream attribution.
+
+### Chore
+
+- E2E: add `e2e/tsconfig.json` so IDEs resolve Node built-in typings in `e2e/*.ts`.

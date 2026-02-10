@@ -285,7 +285,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         type: "connectionState",
         state: mapConnectionState(ctx.client.getState()),
       });
-      send(ctx.ws, { type: "appInfo", version: APP_VERSION || "0.1.21" });
+      send(ctx.ws, { type: "appInfo", version: APP_VERSION || "0.1.22" });
 
       const agents = getAgentsWithStatus();
       if (agents.length === 0) {
