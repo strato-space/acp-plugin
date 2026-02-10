@@ -10,6 +10,22 @@ ACP Plugin is a VS Code extension and a standalone web UI for running ACP (Agent
 - Shared React UI package: `packages/acp-ui/` (used by both the extension webview and `acp-chat`)
 - Standalone web app + server bridge: `acp-chat/`
 
+## Why This Fork Exists
+
+This repository started as an extraction/fork of `cosmos-vibe/Nexus-acp` (Nexus ACP extension).
+
+We forked it to:
+
+- Rebrand around **ACP (Agent Client Protocol)** and use the `acp.*` configuration namespace.
+- Evolve the UI/UX independently (including the standalone `acp-chat` web UI).
+- Stay compatible with Zed’s `agent_servers` config format and ACP tooling ecosystem.
+
+Upstream attribution / prior art:
+
+- `cosmos-vibe/Nexus-acp`
+- `omercnet/vscode-acp`
+- `zed` (agent_servers format; ACP agent CLIs like `@zed-industries/claude-code-acp` / `@zed-industries/codex-acp`)
+
 ## VS Code Extension
 
 ### Dev

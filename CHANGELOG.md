@@ -1,5 +1,15 @@
 # Changelog
 
+## Upstream / Attribution
+
+ACP Plugin started as an extraction/fork of `cosmos-vibe/Nexus-acp` and has since been rebranded and evolved independently.
+
+Upstream attribution / prior art:
+
+- `cosmos-vibe/Nexus-acp`
+- `omercnet/vscode-acp`
+- `zed` (agent_servers format + ACP agent CLIs)
+
 ## 0.1.8 (2026-02-07)
 
 ### Breaking Changes
