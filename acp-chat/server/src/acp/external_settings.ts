@@ -85,8 +85,62 @@ function stripJsonComments(input: string): string {
   return out;
 }
 
-function parseJsonc(input: string): unknown {
-  return JSON.parse(stripJsonComments(input));
+function removeTrailingCommas(input: string): string {
+  let out = "";
+  let inString = false;
+  let quote = '"';
+  let escaping = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+
+    if (inString) {
+      out += c;
+      if (escaping) {
+        escaping = false;
+      } else if (c === "\\") {
+        escaping = true;
+      } else if (c === quote) {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (c === '"' || c === "'") {
+      inString = true;
+      quote = c;
+      out += c;
+      continue;
+    }
+
+    if (c === ",") {
+      // Skip comma if it's followed only by whitespace and then a closing bracket/brace.
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      const next = j < input.length ? input[j] : "";
+      if (next === "}" || next === "]") {
+        continue;
+      }
+    }
+
+    out += c;
+  }
+
+  return out;
+}
+
+function parseJsonc(raw: string): unknown {
+  const noBom = raw.replace(/^\uFEFF/, "");
+  try {
+    return JSON.parse(noBom) as unknown;
+  } catch {
+    const stripped = removeTrailingCommas(stripJsonComments(noBom));
+    try {
+      return JSON.parse(stripped) as unknown;
+    } catch {
+      return null;
+    }
+  }
 }
 
 function expandVars(value: string): string {
@@ -101,13 +155,23 @@ function expandVars(value: string): string {
 }
 
 function getAgentServers(parsed: Record<string, unknown>): Record<string, AgentServerSetting> {
+  const assistant = parsed["assistant"];
+  const assistantServers = (() => {
+    if (!isRecord(assistant)) return undefined;
+    const v =
+      (assistant as Record<string, unknown>)["agent_servers"] ??
+      (assistant as Record<string, unknown>)["agentServers"];
+    return isRecord(v) ? (v as Record<string, AgentServerSetting>) : undefined;
+  })();
+
   const v =
     parsed["acp.agentServers"] ??
     parsed["acp.agent_servers"] ??
     parsed["nexus.agentServers"] ??
     parsed["nexus.agent_servers"] ??
     parsed["agentServers"] ??
-    parsed["agent_servers"];
+    parsed["agent_servers"] ??
+    assistantServers;
   return isRecord(v) ? (v as Record<string, AgentServerSetting>) : {};
 }
 

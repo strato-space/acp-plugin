@@ -83,9 +83,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (
         e.affectsConfiguration("acp.agentServers") ||
+        e.affectsConfiguration("acp.agent_servers") ||
+        // Zed-compatible keys (non-namespaced). We read these from settings.json too.
+        e.affectsConfiguration("agent_servers") ||
+        e.affectsConfiguration("assistant.agent_servers") ||
         e.affectsConfiguration("acp.includeBuiltInAgents") ||
         // Backward-compat: accept legacy Nexus settings if users haven't migrated.
         e.affectsConfiguration("nexus.agentServers") ||
+        e.affectsConfiguration("nexus.agent_servers") ||
         e.affectsConfiguration("nexus.includeBuiltInAgents")
       ) {
         reapplyAgentSettings();
@@ -365,11 +370,39 @@ function parseJsonc(raw: string): unknown {
 function applyAgentSettings(): void {
   const cfg = vscode.workspace.getConfiguration("acp");
   const legacy = vscode.workspace.getConfiguration("nexus");
+  const root = vscode.workspace.getConfiguration();
 
   // Primary: `acp.*` settings.
   let includeBuiltInAgents = cfg.get<boolean>("includeBuiltInAgents", true);
-  let servers =
+  const acpServersSnake =
+    cfg.get<Record<string, AgentServerSetting>>("agent_servers", {}) ?? {};
+  const acpServersCamel =
     cfg.get<Record<string, AgentServerSetting>>("agentServers", {}) ?? {};
+
+  const zedServersRoot = (() => {
+    const v = root.get<unknown>("agent_servers");
+    return isRecord(v) ? (v as Record<string, AgentServerSetting>) : {};
+  })();
+
+  const zedServersAssistant = (() => {
+    const v = root.get<unknown>("assistant");
+    if (!isRecord(v)) return {};
+    const candidate =
+      (v as Record<string, unknown>)["agent_servers"] ??
+      (v as Record<string, unknown>)["agentServers"];
+    return isRecord(candidate)
+      ? (candidate as Record<string, AgentServerSetting>)
+      : {};
+  })();
+
+  // We intentionally follow Zed's `agent_servers` format (snake_case). Prefer ACP
+  // namespaced settings when both are present.
+  let servers = {
+    ...zedServersAssistant,
+    ...zedServersRoot,
+    ...acpServersSnake,
+    ...acpServersCamel,
+  };
 
   const external = tryLoadExternalSettings();
   if (external.servers && Object.keys(external.servers).length > 0) {

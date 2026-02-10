@@ -126,7 +126,7 @@ Manual MCP smoke runbook (LLM-driven UI checks):
 ## Security & Configuration Tips
 
 - Avoid committing secrets or machine-specific paths. For local agent testing, use VS Code
-  User settings (`acp.agentServers`) and `${env:NAME}` placeholders where possible.
+  User settings (`agent_servers` / `acp.agent_servers`) and `${env:NAME}` placeholders where possible.
 
 ## Commit & Pull Request Guidelines
 

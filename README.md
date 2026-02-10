@@ -86,9 +86,13 @@ Runtime env vars used by the server:
 
 ## Agent Configuration
 
+ACP intentionally follows Zed's `agent_servers` format (same keys/shape as `zed.dev`), so you can copy/paste agent definitions between Zed and ACP with minimal changes.
+
 Both the extension and `acp-chat` read agent configs from VS Code settings:
 
-- `acp.agentServers`
+- `agent_servers` (Zed format; recommended)
+- `acp.agent_servers` (namespaced alias)
+- `acp.agentServers` (legacy alias)
 - `acp.includeBuiltInAgents`
 - `acp.connectTimeoutMs`
 
@@ -96,17 +100,18 @@ Example:
 
 ```jsonc
 {
-  "acp.agentServers": {
-    "stratoproject": {
-      "name": "StratoProject",
+  "agent_servers": {
+    "StratoProject": {
+      "type": "custom",
       "command": "uv",
       "args": [
         "--directory",
         "/home/strato-space/prompt/StratoProject/app",
         "run",
+        "--active",
         "StratoProject.py",
         "--transport",
-        "acp"
+        "acp",
       ],
       "env": { "PYTHONUNBUFFERED": "1" }
     }

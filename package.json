@@ -248,6 +248,50 @@
             }
           }
         },
+        "acp.agent_servers": {
+          "type": "object",
+          "default": {},
+          "description": "Alias of acp.agentServers. Matches Zed's agent_servers naming (same shape).",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "command"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Optional type hint (currently informational).",
+                "default": "custom"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name in the agent selector (defaults to the key)."
+              },
+              "command": {
+                "type": "string",
+                "description": "Executable to run (resolved from PATH). Supports ${workspaceFolder}, ${userHome}, ${env:NAME}."
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments to pass to the executable.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the agent process. Supports ${workspaceFolder}, ${userHome}, ${env:NAME}."
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables merged over the extension host environment.",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
         "acp.connectTimeoutMs": {
           "type": "number",
           "default": 600000,

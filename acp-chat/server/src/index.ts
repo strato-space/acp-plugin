@@ -177,7 +177,7 @@ function ensureStratoProjectAgent(agents: AgentConfig[]): AgentConfig[] {
 
   for (const a of out) ensureWatch(a);
 
-  const has = out.some((a) => a.id === "stratoproject");
+  const has = out.some((a) => a.id.toLowerCase() === "stratoproject");
   if (!has) {
     out.push({
       id: "stratoproject",
@@ -187,6 +187,7 @@ function ensureStratoProjectAgent(agents: AgentConfig[]): AgentConfig[] {
         "--directory",
         "/home/strato-space/prompt/StratoProject/app",
         "run",
+        "--active",
         "StratoProject.py",
         "--transport",
         "acp",
