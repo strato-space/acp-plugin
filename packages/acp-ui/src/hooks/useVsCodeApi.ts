@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { useChatStore } from "../store";
 import { detectToolKindFromName } from "@/lib/ansi";
+import type { Model } from "../types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -38,6 +39,63 @@ function safeJsonStringify(value: unknown): string | null {
       return null;
     }
   }
+}
+
+const FAST_AGENT_FALLBACK_MODELS: Model[] = [
+  { modelId: "codex", name: "codex (gpt-5.2-codex)" },
+  { modelId: "codexplan", name: "codexplan (gpt-5.3-codex)" },
+  { modelId: "claude-opus-4-6", name: "claude-opus-4-6" },
+  { modelId: "sonnet", name: "sonnet (claude-sonnet-4-5)" },
+  { modelId: "gemini25pro", name: "gemini25pro (gemini-2.5-pro)" },
+  { modelId: "deepseek32", name: "deepseek32 (DeepSeek-V3.2)" },
+  { modelId: "qwen3", name: "qwen3 (Qwen3-Next-80B-A3B-Instruct)" },
+  { modelId: "kimi25", name: "kimi25 (Kimi-K2.5)" },
+  { modelId: "gpt52", name: "gpt52 (gpt-5.2)" },
+];
+
+function isFastAgentSelected(
+  selectedAgentId: string | null | undefined,
+  agents: Array<{ id: string; name: string }>
+): boolean {
+  const id = (selectedAgentId || "").trim().toLowerCase();
+  if (!id) return false;
+  if (id === "fast-agent-acp") return true;
+  const selected = agents.find((a) => a.id.toLowerCase() === id);
+  if (!selected) return false;
+  return selected.name.toLowerCase().includes("fast agent");
+}
+
+function resolveFallbackModelId(currentModelId: string | null | undefined): string {
+  const preferred = (currentModelId || "").trim();
+  if (preferred && FAST_AGENT_FALLBACK_MODELS.some((m) => m.modelId === preferred)) {
+    return preferred;
+  }
+  return FAST_AGENT_FALLBACK_MODELS[0]?.modelId ?? "";
+}
+
+function mergeUniqueModels(primary: Model[], required: Model[]): Model[] {
+  const merged: Model[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (model: Model) => {
+    const key = (model.modelId || "").trim().toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(model);
+  };
+  for (const model of primary) pushUnique(model);
+  for (const model of required) pushUnique(model);
+  return merged;
+}
+
+function resolveCurrentModelId(
+  models: Model[],
+  preferredCurrentId: string | null | undefined
+): string {
+  const preferred = (preferredCurrentId || "").trim();
+  if (preferred && models.some((m) => m.modelId === preferred)) {
+    return preferred;
+  }
+  return models[0]?.modelId ?? "";
 }
 
 function isConnectNoiseBanner(text: string): boolean {
@@ -736,14 +794,46 @@ export function useVsCodeInit() {
           break;
 
         case "sessionMetadata": {
+          const stateNow = useChatStore.getState();
+          const fastAgentSelected = isFastAgentSelected(
+            stateNow.selectedAgentId,
+            stateNow.agents
+          );
+
           if (msg.modes?.availableModes?.length) {
             actions.setModes(msg.modes.availableModes, msg.modes.currentModeId);
           }
           if (msg.models?.availableModels?.length) {
-            actions.setModels(
-              msg.models.availableModels,
-              msg.models.currentModelId
-            );
+            if (fastAgentSelected) {
+              const mergedModels = mergeUniqueModels(
+                msg.models.availableModels,
+                FAST_AGENT_FALLBACK_MODELS
+              );
+              const currentModelId = resolveCurrentModelId(
+                mergedModels,
+                msg.models.currentModelId || stateNow.currentModelId
+              );
+              actions.setModels(mergedModels, currentModelId);
+            } else {
+              actions.setModels(
+                msg.models.availableModels,
+                msg.models.currentModelId
+              );
+            }
+          } else {
+            if (fastAgentSelected) {
+              const currentModelId = resolveCurrentModelId(
+                FAST_AGENT_FALLBACK_MODELS,
+                (typeof msg.models?.currentModelId === "string" &&
+                msg.models.currentModelId.trim()
+                  ? msg.models.currentModelId.trim()
+                  : stateNow.currentModelId) || ""
+              );
+              actions.setModels(
+                FAST_AGENT_FALLBACK_MODELS,
+                currentModelId || resolveFallbackModelId("")
+              );
+            }
           }
           if (msg.commands) {
             actions.setAvailableCommands(msg.commands);

@@ -84,6 +84,7 @@ interface WebviewMessage {
 const SELECTED_AGENT_STORAGE_KEY = "selectedAgent";
 const SELECTED_MODE_STORAGE_KEY = "selectedMode";
 const SELECTED_MODEL_STORAGE_KEY = "selectedModel";
+const SELECTED_MODEL_AGENT_STORAGE_KEY = "selectedModelAgent";
 const SESSIONS_STORAGE_KEY = "sessions";
 
 // 각 패널의 독립적인 상태를 관리하는 컨텍스트
@@ -508,6 +509,10 @@ export class ChatPanelManager {
                 this.globalState.update(
                   panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
                   requestedModelId
+                );
+                this.globalState.update(
+                  panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY),
+                  ctx.acpClient.getAgentId()
                 );
                 this.globalState.update(
                   LAST_SELECTED_MODEL_STORAGE_KEY,
@@ -1160,6 +1165,20 @@ export class ChatPanelManager {
         agentId
       );
       this.globalState.update(LAST_SELECTED_AGENT_STORAGE_KEY, agentId);
+      // Do not carry mode/model across different agents.
+      // A stale restored model can override agent CLI defaults (e.g. --model codex).
+      this.globalState.update(
+        panelStorageKey(ctx.panelKey, SELECTED_MODE_STORAGE_KEY),
+        undefined
+      );
+      this.globalState.update(
+        panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
+        undefined
+      );
+      this.globalState.update(
+        panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY),
+        undefined
+      );
       ctx.hasSession = false;
       ctx.hasRestoredModeModel = false;
       this.postMessageToPanel(panelId, { type: "agentChanged", agentId });
@@ -1254,6 +1273,10 @@ export class ChatPanelManager {
       await this.globalState.update(
         panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
         modelId
+      );
+      await this.globalState.update(
+        panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY),
+        ctx.acpClient.getAgentId()
       );
       await this.globalState.update(LAST_SELECTED_MODEL_STORAGE_KEY, modelId);
       this.sendSessionMetadata(panelId);
@@ -1454,6 +1477,10 @@ export class ChatPanelManager {
     const savedModelId = this.globalState.get<string>(
       panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY)
     );
+    const savedModelAgentId = this.globalState.get<string>(
+      panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY)
+    );
+    const currentAgentId = ctx.acpClient.getAgentId();
 
     let modeRestored = false;
     let modelRestored = false;
@@ -1469,6 +1496,8 @@ export class ChatPanelManager {
 
     if (
       savedModelId &&
+      savedModelAgentId &&
+      savedModelAgentId === currentAgentId &&
       availableModels.some(
         (model: any) => model && model.modelId === savedModelId
       )

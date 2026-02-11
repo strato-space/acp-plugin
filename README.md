@@ -46,7 +46,9 @@ Notes:
 
 - These are just defaults, not endorsements. Some agents require separate auth/login steps.
 - `npx` requires Node.js to be installed and accessible on `PATH` (especially important for Remote-SSH hosts).
-- For Fast Agent ACP, the default model is `codex`. The CLI help does not expose a stable "list models" command; model choices come from ACP session metadata when the agent provides them.
+- For Fast Agent ACP, the default model is `codex`.
+- Fast Agent model choices are resolved as a union: ACP session metadata (if provided by the agent) plus a built-in coding baseline list in ACP Plugin.
+- The baseline list intentionally includes `claude-opus-4-6` as a required option, even when not returned by agent metadata.
 
 ### Quick Start (VS Code)
 

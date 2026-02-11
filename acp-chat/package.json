@@ -10,10 +10,10 @@
   "scripts": {
     "dev:web": "npm --workspace web run dev",
     "dev:server": "npm --workspace server run dev",
+    "prebuild": "node -e \"const fs=require('fs'); const ok=fs.existsSync('node_modules/@types/express')&&fs.existsSync('node_modules/@types/ws'); process.exit(ok?0:1)\" || npm ci",
     "build:web": "npm --workspace web run build",
     "build:server": "npm --workspace server run build",
     "build": "npm run build:web && npm run build:server",
     "start": "npm --workspace server run start"
   }
 }
-
