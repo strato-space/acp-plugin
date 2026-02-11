@@ -35,28 +35,57 @@ export interface AgentWithStatus extends AgentConfig {
 // Built-in agents. Users can add/override these via VS Code settings.
 export const AGENTS: AgentConfig[] = [
   {
-    id: "opencode",
-    name: "OpenCode",
-    command: "opencode",
-    args: ["acp"],
+    id: "codex",
+    name: "Codex CLI",
+    command: "npx",
+    args: ["--yes", "@zed-industries/codex-acp@latest"],
+  },
+  {
+    id: "github-copilot",
+    name: "GitHub Copilot",
+    command: "npx",
+    args: ["--yes", "@github/copilot-language-server@latest", "--acp"],
   },
   {
     id: "claude-code",
     name: "Claude Code",
     command: "npx",
-    args: ["--yes", "@zed-industries/claude-code-acp"],
-  },
-  {
-    id: "codex",
-    name: "Codex CLI",
-    command: "npx",
-    args: ["--yes", "@zed-industries/codex-acp"],
+    args: ["--yes", "@zed-industries/claude-code-acp@latest"],
   },
   {
     id: "gemini",
     name: "Gemini CLI",
     command: "npx",
-    args: ["--yes", "@google/gemini-cli", "--experimental-acp"],
+    args: ["--yes", "@google/gemini-cli@latest", "--experimental-acp"],
+  },
+  {
+    id: "qwen-code",
+    name: "Qwen Code",
+    command: "npx",
+    args: [
+      "--yes",
+      "@qwen-code/qwen-code@latest",
+      "--acp",
+      "--experimental-skills",
+    ],
+  },
+  {
+    id: "auggie",
+    name: "Auggie CLI",
+    command: "npx",
+    args: ["--yes", "@augmentcode/auggie@latest", "--acp"],
+  },
+  {
+    id: "qoder",
+    name: "Qoder CLI",
+    command: "npx",
+    args: ["--yes", "@qoder-ai/qodercli@latest", "--acp"],
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    command: "npx",
+    args: ["--yes", "opencode-ai@latest", "acp"],
   },
 ];
 

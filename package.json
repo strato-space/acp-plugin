@@ -1,8 +1,8 @@
 {
   "name": "acp-plugin",
-  "displayName": "ACP — Agent Communication Protocol",
+  "displayName": "ACP Plugin",
   "description": "ACP client for VS Code. Chat with Agent Client Protocol (ACP) compatible coding agents directly in your editor.",
-  "version": "0.1.22",
+  "version": "0.1.27",
   "license": "Apache-2.0",
   "publisher": "strato-space",
   "icon": "assets/icon.png",
@@ -53,7 +53,7 @@
     "commands": [
       {
         "command": "acp.focusChat",
-        "title": "ACP",
+        "title": "Open ACP Chat",
         "category": "ACP",
         "icon": {
           "light": "assets/icon.png",
@@ -101,8 +101,8 @@
       "activitybar": [
         {
           "id": "acp",
-          "title": "ACP — Agent Communication Protocol",
-          "icon": "assets/icon.svg"
+          "title": "ACP Plugin",
+          "icon": "assets/activitybar-icon.svg"
         }
       ]
     },
@@ -197,17 +197,17 @@
       ]
     },
     "configuration": {
-      "title": "ACP — Agent Communication Protocol",
+      "title": "ACP Plugin",
       "properties": {
         "acp.includeBuiltInAgents": {
           "type": "boolean",
           "default": true,
-          "description": "Include built-in agents (OpenCode, Claude Code, Codex, Gemini) in the agent selector."
+          "description": "When true, built-in agents are unioned with workspace-defined agents from `agent_servers` / `acp.agents` in the selector."
         },
-        "acp.agentServers": {
+        "agent_servers": {
           "type": "object",
           "default": {},
-          "description": "Custom ACP agents (externalized settings, similar to Zed's agent_servers). Keys are agent ids; values describe how to start the agent.",
+          "description": "Agent configurations (Zed-compatible). Keys are agent ids; values describe how to start the agent process.",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -248,10 +248,10 @@
             }
           }
         },
-        "acp.agent_servers": {
+        "acp.agents": {
           "type": "object",
           "default": {},
-          "description": "Alias of acp.agentServers. Matches Zed's agent_servers naming (same shape).",
+          "description": "Supported alias of `agent_servers` for upstream `formulahendry/vscode-acp` (same shape).",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -291,6 +291,25 @@
               }
             }
           }
+        },
+        "acp.autoApprovePermissions": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "allowAll"
+          ],
+          "default": "ask",
+          "description": "How ACP permission requests are handled: 'ask' prompts every time, 'allowAll' approves everything."
+        },
+        "acp.defaultWorkingDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Default working directory for agent processes. Empty uses the current workspace folder."
+        },
+        "acp.logTraffic": {
+          "type": "boolean",
+          "default": true,
+          "description": "Log all ACP protocol traffic to the 'ACP Traffic' output channel."
         },
         "acp.connectTimeoutMs": {
           "type": "number",

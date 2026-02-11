@@ -10,6 +10,37 @@ Upstream attribution / prior art:
 - `omercnet/vscode-acp`
 - `zed` (agent_servers format + ACP agent CLIs)
 
+## 0.1.27 (2026-02-11)
+
+### Docs
+
+- AGENTS.md: refresh build/install instructions to repo-root-relative commands only; update Remote-SSH install flow to use `$XDG_RUNTIME_DIR`.
+- README: add explicit troubleshooting note for missing custom agents (`acp.agentServers` -> `agent_servers` / `acp.agents`).
+- README: update Zed reference link to the current External Agents docs page.
+
+### Fixes
+
+- Settings compatibility: migrate active workspace settings from deprecated `acp.agentServers` to canonical `agent_servers` so custom agents are discovered again.
+
+## 0.1.25 (2026-02-11)
+
+### Features
+
+- Config: make `agent_servers` the canonical agent config format and keep `acp.agents` as an upstream-compatible alias (`formulahendry/vscode-acp`).
+- Config: merge agents from `acp.agents` and canonical `agent_servers` (higher priority overrides).
+- Settings: implement upstream-compatible settings: `acp.autoApprovePermissions`, `acp.defaultWorkingDirectory`, `acp.logTraffic`.
+- UI: add a sticky thread header with Settings + New chat buttons (plus Reload).
+
+### Fixes
+
+- Remove deprecated `agentServers` / `acp.agent_servers` keys (keep only `agent_servers` + `acp.agents`).
+- Branding: rename titles/tooltips from "Agent Communication Protocol" to "ACP Plugin".
+
+### Docs
+
+- README: rewrite and expand docs (config schema, presets, settings, and fork rationale).
+- Repo path: canonical local workspace path moved under `/home/tools/acp/strato-space/acp-plugin` (without symlink fallback).
+
 ## 0.1.8 (2026-02-07)
 
 ### Breaking Changes
@@ -37,13 +68,13 @@ Upstream attribution / prior art:
 ### UI
 
 - Rename the mode selector label to **Subagent/Mode** (clarity for agent "modes").
-- Update UI titles/tooltips to **ACP Agent Communication Protocol**.
+- Update UI titles/tooltips to **ACP Plugin**.
 
 ## 0.1.10 (2026-02-07)
 
 ### UI
 
-- Update the activity bar title/tooltips to **ACP — Agent Communication Protocol**.
+- Update the activity bar title/tooltips to **ACP Plugin**.
 - Sidebar: use the editor background (theme-aligned) and update the header logo to the ACP mark.
 - Thinking: replace the Processing brain icon with a running ellipsis and align its tone with Reasoning.
 
@@ -51,7 +82,7 @@ Upstream attribution / prior art:
 
 ### Fixes
 
-- Agents: retry applying `acp.agentServers` on activation and refresh on workspace folder changes so custom agents show up reliably.
+- Agents: retry applying agent settings on activation and refresh on workspace folder changes so custom agents show up reliably.
 - Connect: make connect idempotent (no sticky "already connected/connecting" banner) and optimistically switch UI to **Connecting** to prevent double-clicks.
 - Icons: use the ACP activity bar icon **SVG** (from `vscode-acp`) and refresh `assets/icon.png`.
 - Markdown: reduce paragraph/list spacing to avoid extra blank lines after streaming.
@@ -155,7 +186,7 @@ Upstream attribution / prior art:
 
 ### Features
 
-- Config: support Zed-compatible `agent_servers` settings (including `assistant.agent_servers`) and add `acp.agent_servers` alias.
+- Config: support Zed-compatible `agent_servers` settings and add `acp.agents` alias (upstream `formulahendry/vscode-acp` compatibility).
 
 ### Docs
 

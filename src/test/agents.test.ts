@@ -25,7 +25,7 @@ suite("agents", () => {
     test("should include opencode agent", () => {
       const opencode = AGENTS.find((a) => a.id === "opencode");
       assert.ok(opencode, "opencode agent should exist");
-      assert.strictEqual(opencode?.command, "opencode");
+      assert.strictEqual(opencode?.command, "npx");
     });
 
     test("should include claude-code agent", () => {
@@ -55,9 +55,9 @@ suite("agents", () => {
       assert.strictEqual(defaultAgent, AGENTS[0]);
     });
 
-    test("should return opencode as default", () => {
+    test("should return codex as default", () => {
       const defaultAgent = getDefaultAgent();
-      assert.strictEqual(defaultAgent.id, "opencode");
+      assert.strictEqual(defaultAgent.id, "codex");
     });
   });
 });

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/tools/acp-plugin/acp-chat
+WorkingDirectory=/home/tools/acp/strato-space/acp-plugin/acp-chat
 Environment=NODE_ENV=production
 Environment=ACP_CHAT_HOST=127.0.0.1
 Environment=ACP_CHAT_PORT=8732

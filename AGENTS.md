@@ -19,7 +19,7 @@
 - `npm run compile`: one-off build (typecheck + webview build + bundle).
 - `npm run package`: production build (used by `vsce` packaging).
 - `npx vsce package --no-dependencies`: create a `.vsix` for manual install/testing.
-- `cd acp-chat && npm ci && npm run build`: build the standalone web UI + server bridge.
+- `npm --prefix acp-chat ci && npm --prefix acp-chat run build`: build the standalone web UI + server bridge.
 
 Tip: In VS Code, use the "Run Extension" and "Extension Tests" launch configs
 (`.vscode/launch.json`).
@@ -34,7 +34,6 @@ CLI.
 From the repo root:
 
 ```bash
-cd /home/tools/acp-plugin
 npm ci
 npm run package
 
@@ -60,14 +59,15 @@ code --install-extension ./acp-plugin-<version>.vsix --force
 
 When using Remote-SSH, `code --install-extension ...` runs against the remote VS Code Server
 via a UNIX socket. If the CLI can't find the right socket, you'll see errors like `ENOENT` or
-`ECONNREFUSED` under `/run/user/<uid>/vscode-ipc-*.sock`.
+`ECONNREFUSED` for `vscode-ipc-*.sock`.
 
 The most reliable approach is to try all sockets until one responds:
 
 ```bash
-VSIX=/home/tools/acp-plugin/acp-plugin-<version>.vsix
+VSIX=./acp-plugin-<version>.vsix
+RUNTIME_DIR="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}"
 
-for s in /run/user/$(id -u)/vscode-ipc-*.sock; do
+for s in "$RUNTIME_DIR"/vscode-ipc-*.sock; do
   echo "Trying $s"
   VSCODE_IPC_HOOK_CLI="$s" code --install-extension "$VSIX" --force && break
 done
@@ -78,17 +78,16 @@ to ensure the new extension code is loaded.
 
 Notes:
 
-- The composer includes an icon-only **Reload** button that reloads the ACP webview UI
-  (useful for UI-only changes without restarting VS Code).
-- If you changed the extension host code (TypeScript under `src/`), you still need
-  `Developer: Restart Extension Host` or `Developer: Reload Window`.
+- For extension host changes (TypeScript under `src/`), use `Developer: Reload Window`
+  or `Developer: Restart Extension Host`.
+- For UI-only changes (`packages/acp-ui`, `src/views/webview`), reopen ACP chat after install/reload.
 
 ### 4) Verify / Cleanup
 
 List installed extensions (with versions):
 
 ```bash
-code --list-extensions --show-versions | rg -i 'acp-plugin|nexus-acp|vscode-acp'
+code --list-extensions --show-versions | rg -i 'acp-plugin'
 ```
 
 Optional: uninstall the old Nexus extension (new extension uses `acp.*` settings, not
@@ -126,7 +125,10 @@ Manual MCP smoke runbook (LLM-driven UI checks):
 ## Security & Configuration Tips
 
 - Avoid committing secrets or machine-specific paths. For local agent testing, use VS Code
-  User settings (`agent_servers` / `acp.agent_servers`) and `${env:NAME}` placeholders where possible.
+  settings (`agent_servers` / `acp.agents`) and `${env:NAME}` placeholders where possible.
+- Canonical agent key is `agent_servers`; `acp.agents` is supported as an alias.
+- `acp.agentServers` is deprecated and not read by current builds. If custom agents do not show up,
+  migrate entries to `agent_servers` in VS Code settings.
 
 ## Commit & Pull Request Guidelines
 

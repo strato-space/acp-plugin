@@ -42,7 +42,7 @@ export function ChatContainer() {
 
   return (
     <ScrollArea
-      className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4"
+      className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4 pt-2"
       scrollRef={scrollRef}
       onKeyDown={handleKeyDown}
     >

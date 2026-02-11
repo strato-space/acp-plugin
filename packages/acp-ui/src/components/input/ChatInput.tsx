@@ -4,8 +4,8 @@ import { useChatStore } from "@/store";
 import { useVsCodeApi } from "@/hooks/useVsCodeApi";
 import { Button } from "@/components/ui/button";
 import { CommandAutocomplete } from "./CommandAutocomplete";
-import { SettingsDropdown } from "./SettingsDropdown";
 import { AttachmentChip } from "./AttachmentChip";
+import { SettingsDropdown } from "./SettingsDropdown";
 import type { AvailableCommand, Attachment } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -530,18 +530,6 @@ export function ChatInput() {
             {/* Left side: Settings and attachment buttons */}
             <div className="flex items-center gap-1">
               <SettingsDropdown />
-
-              {/* Reload webview (no window reload) */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => window.location.reload()}
-                className="h-8 w-8 rounded-full"
-                aria-label="Reload"
-                title="Reload"
-              >
-                <span className="text-base leading-none">↻</span>
-              </Button>
 
               {/* Attach file button */}
               <Button

@@ -49,12 +49,25 @@ export function SettingsDropdown() {
       right = window.innerWidth - dropdownWidth - margin;
     }
 
-    setDropdownStyle({
+    // Prefer placing below the button when there's space (e.g. header toolbar).
+    // Otherwise place above (e.g. composer toolbar at the bottom).
+    const approxDropdownHeight = 360;
+    const spaceBelow = window.innerHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
+    const placeBelow =
+      spaceBelow >= approxDropdownHeight || spaceBelow >= spaceAbove;
+
+    const base: React.CSSProperties = {
       position: "fixed",
-      bottom: window.innerHeight - buttonRect.top + margin,
       right: Math.max(margin, right),
       width: Math.min(dropdownWidth, window.innerWidth - margin * 2),
-    });
+    };
+
+    setDropdownStyle(
+      placeBelow
+        ? { ...base, top: buttonRect.bottom + margin }
+        : { ...base, bottom: window.innerHeight - buttonRect.top + margin }
+    );
   }, []);
 
   // Close dropdown when clicking outside
@@ -241,7 +254,7 @@ export function SettingsDropdown() {
         className="relative w-9 h-9 rounded-full"
         aria-label="Settings"
         aria-expanded={isOpen}
-        title="ACP — Agent Communication Protocol"
+        title="Settings"
       >
         {/* Settings icon */}
         <svg

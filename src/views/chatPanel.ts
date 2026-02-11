@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { randomUUID } from "crypto";
+import * as os from "os";
 import { ACPClient } from "../acp/client";
 import {
   getAgent,
@@ -9,6 +10,8 @@ import {
 import type {
   SessionNotification,
   ContentBlock,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
 } from "@agentclientprotocol/sdk";
 
 const PANEL_STORAGE_PREFIX = "acp.panels";
@@ -102,6 +105,7 @@ export class ChatPanelManager {
   private globalState: vscode.Memento;
   private disposables: vscode.Disposable[] = [];
   private output: vscode.OutputChannel;
+  private trafficOutput: vscode.OutputChannel;
   private readonly appVersion?: string;
   private onGlobalStateChange?: (
     state: "disconnected" | "connecting" | "connected" | "error"
@@ -119,6 +123,119 @@ export class ChatPanelManager {
     this.appVersion = appVersion;
     this.onGlobalStateChange = onGlobalStateChange;
     this.output = vscode.window.createOutputChannel("ACP");
+    this.trafficOutput = vscode.window.createOutputChannel("ACP Traffic");
+  }
+
+  public refreshRuntimeSettings(): void {
+    const cfg = vscode.workspace.getConfiguration("acp");
+    const connectTimeoutMs = cfg.get<number>("connectTimeoutMs", 600_000);
+    const defaultWorkingDirectory = this.getDefaultWorkingDirectory();
+
+    for (const ctx of this.contexts.values()) {
+      ctx.acpClient.setConnectTimeoutMs(connectTimeoutMs);
+      ctx.acpClient.setDefaultWorkingDirectory(defaultWorkingDirectory);
+    }
+  }
+
+  private expandVars(value: string): string {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return value.replace(/\$\{([^}]+)\}/g, (_m, key: string) => {
+      if (key === "workspaceFolder") return workspaceFolder ?? "";
+      if (key === "userHome") return os.homedir();
+      if (key.startsWith("env:")) {
+        const envKey = key.slice("env:".length);
+        return process.env[envKey] ?? "";
+      }
+      return "";
+    });
+  }
+
+  private getDefaultWorkingDirectory(): string | undefined {
+    const cfg = vscode.workspace.getConfiguration("acp");
+    const raw = (cfg.get<string>("defaultWorkingDirectory", "") ?? "").trim();
+    if (raw) {
+      const expanded = this.expandVars(raw).trim();
+      return expanded || undefined;
+    }
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  private logTraffic(direction: "send" | "recv", data: unknown): void {
+    const cfg = vscode.workspace.getConfiguration("acp");
+    if (!cfg.get<boolean>("logTraffic", true)) return;
+
+    const arrow =
+      direction === "send" ? ">>> CLIENT -> AGENT" : "<<< AGENT -> CLIENT";
+    const timestamp = new Date().toISOString();
+
+    // Classify message type (JSON-RPC request/notification/response).
+    const msg = data as Record<string, unknown> | null;
+    let label = "";
+    if (msg && typeof msg === "object") {
+      if ("method" in msg && "id" in msg) {
+        label = ` [REQUEST] ${String(msg.method)}`;
+      } else if ("method" in msg && !("id" in msg)) {
+        label = ` [NOTIFICATION] ${String(msg.method)}`;
+      } else if ("result" in msg || "error" in msg) {
+        label = ` [RESPONSE] id=${String(msg.id)}`;
+      }
+    }
+
+    try {
+      this.trafficOutput.appendLine(
+        `[${timestamp}] ${arrow}${label}\n${JSON.stringify(data, null, 2)}\n`
+      );
+    } catch (err) {
+      // Logging must never crash the extension host.
+      this.trafficOutput.appendLine(
+        `[${timestamp}] ${arrow}${label}\n<failed to stringify: ${String(err)}>\n`
+      );
+    }
+  }
+
+  private async requestPermission(
+    params: RequestPermissionRequest
+  ): Promise<RequestPermissionResponse> {
+    const cfg = vscode.workspace.getConfiguration("acp");
+    const autoApprove = cfg.get<string>("autoApprovePermissions", "ask");
+
+    const title = params.toolCall?.title || "Permission Request";
+    this.output.appendLine(
+      `[ACP] Permission request: ${title} (autoApprove=${autoApprove})`
+    );
+
+    if (autoApprove === "allowAll") {
+      const allowOption = params.options.find(
+        (opt) => opt.kind === "allow_once" || opt.kind === "allow_always"
+      );
+      if (allowOption) {
+        return {
+          outcome: { outcome: "selected", optionId: allowOption.optionId },
+        };
+      }
+    }
+
+    const items: (vscode.QuickPickItem & { optionId: string })[] =
+      params.options.map((option) => {
+        const icon = option.kind.startsWith("allow") ? "$(check)" : "$(x)";
+        return {
+          label: `${icon} ${option.name}`,
+          description: option.kind,
+          optionId: option.optionId,
+        };
+      });
+
+    const selection = await vscode.window.showQuickPick(items, {
+      placeHolder: title,
+      title: "ACP Agent Permission Request",
+      ignoreFocusOut: true,
+    });
+
+    if (!selection) {
+      return { outcome: { outcome: "cancelled" } };
+    }
+
+    return { outcome: { outcome: "selected", optionId: selection.optionId } };
   }
 
   private postAgents(panelId: string): void {
@@ -204,10 +321,14 @@ export class ChatPanelManager {
     panel.webview.html = this.getHtmlContent(panel.webview);
 
     // 패널별 독립 ACPClient 생성
-    const connectTimeoutMs = vscode.workspace
-      .getConfiguration("acp")
-      .get<number>("connectTimeoutMs", 600_000);
-    const acpClient = new ACPClient({ connectTimeoutMs });
+    const cfg = vscode.workspace.getConfiguration("acp");
+    const connectTimeoutMs = cfg.get<number>("connectTimeoutMs", 600_000);
+    const defaultWorkingDirectory = this.getDefaultWorkingDirectory();
+    const acpClient = new ACPClient({
+      connectTimeoutMs,
+      defaultWorkingDirectory,
+      onTraffic: (direction, message) => this.logTraffic(direction, message),
+    });
 
     // 저장된 에이전트 설정 적용
     const savedAgentId = this.globalState.get<string>(
@@ -270,6 +391,8 @@ export class ChatPanelManager {
     acpClient.setOnSessionUpdate((update) => {
       this.handleSessionUpdate(panelId, update);
     });
+
+    acpClient.setOnPermissionRequest((params) => this.requestPermission(params));
 
     acpClient.setOnStderr((text) => {
       this.handleStderr(panelId, text);

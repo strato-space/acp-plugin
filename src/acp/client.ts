@@ -47,6 +47,15 @@ export interface ACPClientOptions {
   spawn?: SpawnFunction;
   skipAvailabilityCheck?: boolean;
   /**
+   * Default working directory used when the selected agent does not provide `cwd`.
+   * The extension host computes/expands this from VS Code settings.
+   */
+  defaultWorkingDirectory?: string;
+  /**
+   * Optional hook for logging raw ACP JSON-RPC messages.
+   */
+  onTraffic?: (direction: "send" | "recv", message: unknown) => void;
+  /**
    * Max time to wait for ACP initialize() to complete.
    * If exceeded, the agent process is killed and connect() rejects.
    */
@@ -68,6 +77,8 @@ export class ACPClient {
   private agentConfig: AgentConfig;
   private spawnFn: SpawnFunction;
   private skipAvailabilityCheck: boolean;
+  private defaultWorkingDirectory: string | undefined;
+  private onTraffic: ((direction: "send" | "recv", message: unknown) => void) | undefined;
   private connectTimeoutMs: number;
 
   constructor(options?: ACPClientOptions | AgentConfig) {
@@ -75,13 +86,25 @@ export class ACPClient {
       this.agentConfig = options;
       this.spawnFn = nodeSpawn as SpawnFunction;
       this.skipAvailabilityCheck = false;
+      this.defaultWorkingDirectory = undefined;
+      this.onTraffic = undefined;
       this.connectTimeoutMs = 600_000;
     } else {
       this.agentConfig = options?.agentConfig ?? getDefaultAgent();
       this.spawnFn = options?.spawn ?? (nodeSpawn as SpawnFunction);
       this.skipAvailabilityCheck = options?.skipAvailabilityCheck ?? false;
+      this.defaultWorkingDirectory = options?.defaultWorkingDirectory;
+      this.onTraffic = options?.onTraffic;
       this.connectTimeoutMs = options?.connectTimeoutMs ?? 600_000;
     }
+  }
+
+  setDefaultWorkingDirectory(cwd: string | undefined): void {
+    this.defaultWorkingDirectory = cwd;
+  }
+
+  setConnectTimeoutMs(timeoutMs: number): void {
+    this.connectTimeoutMs = timeoutMs;
   }
 
   setAgent(config: AgentConfig): void {
@@ -161,7 +184,7 @@ export class ACPClient {
         this.agentConfig.args,
         {
           stdio: ["pipe", "pipe", "pipe"],
-          cwd: this.agentConfig.cwd,
+          cwd: this.agentConfig.cwd ?? this.defaultWorkingDirectory,
           env: { ...process.env, ...(this.agentConfig.env ?? {}) },
         }
       );
@@ -248,10 +271,52 @@ export class ACPClient {
         );
       }
 
-      const stream = ndJsonStream(
+      const baseStream = ndJsonStream(
         Writable.toWeb(this.process.stdin) as WritableStream<Uint8Array>,
         Readable.toWeb(this.process.stdout) as ReadableStream<Uint8Array>
       );
+
+      const onTraffic = this.onTraffic;
+      const stream = onTraffic
+        ? {
+            readable: new ReadableStream({
+              async start(controller) {
+                const reader = baseStream.readable.getReader();
+                try {
+                  while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value === undefined) continue;
+                    try {
+                      onTraffic("recv", value);
+                    } catch {
+                      // Logging must never break the connection.
+                    }
+                    controller.enqueue(value);
+                  }
+                } finally {
+                  reader.releaseLock();
+                  controller.close();
+                }
+              },
+            }),
+            writable: new WritableStream({
+              async write(message) {
+                try {
+                  onTraffic("send", message);
+                } catch {
+                  // Logging must never break the connection.
+                }
+                const writer = baseStream.writable.getWriter();
+                try {
+                  await writer.write(message);
+                } finally {
+                  writer.releaseLock();
+                }
+              },
+            }),
+          }
+        : baseStream;
 
       const client: Client = {
         requestPermission: async (

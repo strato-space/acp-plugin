@@ -155,28 +155,24 @@ function expandVars(value: string): string {
 }
 
 function getAgentServers(parsed: Record<string, unknown>): Record<string, AgentServerSetting> {
-  const assistant = parsed["assistant"];
-  const assistantServers = (() => {
-    if (!isRecord(assistant)) return undefined;
-    const v =
-      (assistant as Record<string, unknown>)["agent_servers"] ??
-      (assistant as Record<string, unknown>)["agentServers"];
-    return isRecord(v) ? (v as Record<string, AgentServerSetting>) : undefined;
-  })();
+  const merged: Record<string, AgentServerSetting> = {};
 
-  const v =
-    parsed["acp.agentServers"] ??
-    parsed["acp.agent_servers"] ??
-    parsed["nexus.agentServers"] ??
-    parsed["nexus.agent_servers"] ??
-    parsed["agentServers"] ??
-    parsed["agent_servers"] ??
-    assistantServers;
-  return isRecord(v) ? (v as Record<string, AgentServerSetting>) : {};
+  const merge = (v: unknown) => {
+    if (!isRecord(v)) return;
+    Object.assign(merged, v as Record<string, AgentServerSetting>);
+  };
+
+  // Supported alias: `acp.agents` has the same shape as `agent_servers`.
+  merge(parsed["acp.agents"]);
+
+  // Canonical Zed-compatible key at root.
+  merge(parsed["agent_servers"]);
+
+  return merged;
 }
 
 function getIncludeBuiltins(parsed: Record<string, unknown>): boolean | undefined {
-  const v = parsed["acp.includeBuiltInAgents"] ?? parsed["nexus.includeBuiltInAgents"];
+  const v = parsed["acp.includeBuiltInAgents"];
   return typeof v === "boolean" ? v : undefined;
 }
 
@@ -187,54 +183,81 @@ export type ExternalAgentSettings = {
 };
 
 export function loadExternalAgentSettings(): ExternalAgentSettings {
-  const candidates = [
-    path.join(os.homedir(), ".vscode", "settings.json"),
+  const candidates: Array<{ path: string; scope: "global" | "workspace" }> = [
+    { path: path.join(os.homedir(), ".vscode", "settings.json"), scope: "global" },
     // Remote-SSH / server-side VS Code settings.
-    path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
-    path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
-    "/home/.vscode/settings.json",
-    "/home/strato-space/.vscode/settings.json",
+    {
+      path: path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
+      scope: "global",
+    },
+    {
+      path: path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
+      scope: "global",
+    },
+    { path: "/home/strato-space/.vscode/settings.json", scope: "workspace" },
+    { path: "/home/user/workspace/.vscode/settings.json", scope: "workspace" },
   ];
 
-  for (const p of candidates) {
+  const globalServers: Record<string, AgentServerSetting> = {};
+  const workspaceServers: Record<string, AgentServerSetting> = {};
+  let includeGlobal: boolean | undefined;
+  let includeWorkspace: boolean | undefined;
+  const loadedPaths: string[] = [];
+
+  for (const candidate of candidates) {
+    const p = candidate.path;
     try {
       if (!fs.existsSync(p)) continue;
       const raw = fs.readFileSync(p, "utf8");
       const parsed = parseJsonc(raw);
       if (!isRecord(parsed)) continue;
 
-      const includeBuiltins = getIncludeBuiltins(parsed);
+      const include = getIncludeBuiltins(parsed);
       const servers = getAgentServers(parsed);
-      if (Object.keys(servers).length === 0 && includeBuiltins === undefined) {
+      if (Object.keys(servers).length === 0 && include === undefined) {
         continue;
       }
-
-      const agents: AgentConfig[] = [];
-      for (const [id, rawServer] of Object.entries(servers)) {
-        if (!rawServer || typeof rawServer !== "object") continue;
-        const command = (rawServer as any).command;
-        if (!command || typeof command !== "string") continue;
-
-        const args: string[] = Array.isArray((rawServer as any).args)
-          ? (rawServer as any).args.filter((a: unknown): a is string => typeof a === "string")
-          : [];
-
-        agents.push({
-          id,
-          name: (rawServer as any).name && typeof (rawServer as any).name === "string" ? (rawServer as any).name : id,
-          command: expandVars(command),
-          args: args.map(expandVars),
-          cwd: (rawServer as any).cwd && typeof (rawServer as any).cwd === "string" ? expandVars((rawServer as any).cwd) : undefined,
-          env: (rawServer as any).env && typeof (rawServer as any).env === "object" ? (rawServer as any).env : undefined,
-        });
+      if (candidate.scope === "workspace") {
+        Object.assign(workspaceServers, servers);
+        if (include !== undefined) includeWorkspace = include;
+      } else {
+        Object.assign(globalServers, servers);
+        if (include !== undefined) includeGlobal = include;
       }
-
-      return { includeBuiltins, agents, sourcePath: p };
+      loadedPaths.push(p);
     } catch {
       // ignore invalid files; users can still rely on built-ins.
       continue;
     }
   }
 
-  return { agents: [] };
+  const mergedServers = { ...globalServers, ...workspaceServers };
+  const agents: AgentConfig[] = [];
+  for (const [id, rawServer] of Object.entries(mergedServers)) {
+    if (!rawServer || typeof rawServer !== "object") continue;
+    const command = (rawServer as any).command;
+    if (!command || typeof command !== "string") continue;
+
+    const args: string[] = Array.isArray((rawServer as any).args)
+      ? (rawServer as any).args.filter((a: unknown): a is string => typeof a === "string")
+      : [];
+
+    agents.push({
+      id,
+      name: (rawServer as any).name && typeof (rawServer as any).name === "string" ? (rawServer as any).name : id,
+      command: expandVars(command),
+      args: args.map(expandVars),
+      cwd: (rawServer as any).cwd && typeof (rawServer as any).cwd === "string" ? expandVars((rawServer as any).cwd) : undefined,
+      env: (rawServer as any).env && typeof (rawServer as any).env === "object" ? (rawServer as any).env : undefined,
+    });
+  }
+
+  const includeBuiltins =
+    includeWorkspace !== undefined ? includeWorkspace : includeGlobal;
+
+  return {
+    includeBuiltins,
+    agents,
+    sourcePath: loadedPaths.length > 0 ? loadedPaths.join(", ") : undefined,
+  };
 }

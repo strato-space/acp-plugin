@@ -17,7 +17,7 @@ suite("ACPClient", () => {
 
   suite("constructor", () => {
     test("should create client with default agent", () => {
-      assert.strictEqual(client.getAgentId(), "opencode");
+      assert.strictEqual(client.getAgentId(), "codex");
     });
 
     test("should create client with custom agent", () => {
