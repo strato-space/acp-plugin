@@ -171,6 +171,7 @@ export const MessageBubble = memo(function MessageBubble({
           title={title}
           state={frameState}
           inputText={inputText}
+          thinkingText={message.thinkingText ?? null}
           tools={message.tools && Object.keys(message.tools).length > 0 ? message.tools : null}
           outputText={message.text}
           defaultOpen={!!(message.tools && Object.keys(message.tools).length > 0)}

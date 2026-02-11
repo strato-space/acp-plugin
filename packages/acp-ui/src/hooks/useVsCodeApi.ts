@@ -400,7 +400,6 @@ export function useVsCodeInit() {
             }
           }
 
-          actions.clearThinking(); // Thinking 초기화
           const maybeHtml =
             typeof msg.html === "string" ? stripConnectNoiseBanners(msg.html) : msg.html;
           actions.endStreaming(maybeHtml);
@@ -879,6 +878,7 @@ export function useVsCodeInit() {
           type: m.type,
           text: m.text,
           html: m.html,
+          thinkingText: m.thinkingText,
           timestamp: m.timestamp,
           attachments: m.attachments,
           tools: m.tools,
@@ -987,6 +987,7 @@ export function useVsCodeApi() {
           type: string;
           text: string;
           html?: string;
+          thinkingText?: string;
           timestamp: number;
           attachments?: unknown[];
           tools?: Record<string, unknown>;

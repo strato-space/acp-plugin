@@ -183,20 +183,45 @@ export type ExternalAgentSettings = {
 };
 
 export function loadExternalAgentSettings(): ExternalAgentSettings {
-  const candidates: Array<{ path: string; scope: "global" | "workspace" }> = [
-    { path: path.join(os.homedir(), ".vscode", "settings.json"), scope: "global" },
-    // Remote-SSH / server-side VS Code settings.
-    {
-      path: path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
-      scope: "global",
-    },
-    {
-      path: path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
-      scope: "global",
-    },
-    { path: "/home/strato-space/.vscode/settings.json", scope: "workspace" },
-    { path: "/home/user/workspace/.vscode/settings.json", scope: "workspace" },
-  ];
+  const candidates: Array<{ path: string; scope: "global" | "workspace" }> = [];
+  const seenCandidates = new Set<string>();
+  const pushCandidate = (candidate: {
+    path: string;
+    scope: "global" | "workspace";
+  }) => {
+    const normalizedPath = path.normalize(candidate.path);
+    const key = `${candidate.scope}:${normalizedPath}`;
+    if (seenCandidates.has(key)) return;
+    seenCandidates.add(key);
+    candidates.push({ ...candidate, path: normalizedPath });
+  };
+
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode", "settings.json"),
+    scope: "global",
+  });
+  // Remote-SSH / server-side VS Code settings.
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
+    scope: "global",
+  });
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
+    scope: "global",
+  });
+
+  // Walk up from current working directory so workspace-level settings such as
+  // /home/.vscode/settings.json are discovered without hardcoded paths.
+  let currentDir = process.cwd();
+  while (true) {
+    pushCandidate({
+      path: path.join(currentDir, ".vscode", "settings.json"),
+      scope: "workspace",
+    });
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) break;
+    currentDir = parent;
+  }
 
   const globalServers: Record<string, AgentServerSetting> = {};
   const workspaceServers: Record<string, AgentServerSetting> = {};

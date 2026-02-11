@@ -10,6 +10,28 @@ Upstream attribution / prior art:
 - `omercnet/vscode-acp`
 - `zed` (agent_servers format + ACP agent CLIs)
 
+## 0.1.28 (2026-02-11)
+
+### UI
+
+- Preserve the `Reasoning` block after publish by storing streamed reasoning in message history instead of clearing it at stream end.
+- Agent selector: separate built-in and custom agents with a thin visual divider when both groups are present.
+
+### Features
+
+- Built-in agents: add `fast-agent-acp` in position #2 (right after `codex`) with default command `uvx fast-agent-acp --model codex`.
+- Agent metadata: include `source` (`builtin` or `custom`) in extension/server payloads so UI can render grouped agent lists deterministically.
+
+### Fixes
+
+- Workspace settings discovery: remove hardcoded workspace paths and resolve workspace `settings.json` dynamically from opened workspace roots.
+- `acp-chat` external settings loader: walk up from current working directory to discover workspace-level `.vscode/settings.json` (including `/home/.vscode/settings.json` setups).
+
+### Docs
+
+- README: add `fast-agent-acp` to pre-configured agents and note model behavior.
+- README: clarify workspace settings path resolution (example for workspace root `/home`).
+
 ## 0.1.27 (2026-02-11)
 
 ### Docs

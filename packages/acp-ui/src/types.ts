@@ -34,6 +34,7 @@ export interface Agent {
   id: string;
   name: string;
   available: boolean;
+  source?: "builtin" | "custom";
 }
 
 export interface Mode {
@@ -63,6 +64,7 @@ export interface Message {
   type: "user" | "assistant" | "error" | "system";
   text: string;
   html?: string;
+  thinkingText?: string;
   tools?: Record<string, Tool>;
   timestamp: number;
   attachments?: Attachment[]; // 첨부 파일 (이미지 등)

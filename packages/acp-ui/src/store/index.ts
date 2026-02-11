@@ -457,13 +457,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((state) => {
       const { streaming } = state;
       const finalText = streaming.currentText.trim();
+      const finalThinking = streaming.thinkingText.trim();
 
-      if (finalText || html || Object.keys(streaming.tools).length > 0) {
+      if (
+        finalText ||
+        finalThinking ||
+        html ||
+        Object.keys(streaming.tools).length > 0
+      ) {
         const newMessage: Message = {
           id: crypto.randomUUID(),
           type: "assistant",
           text: finalText,
           html,
+          thinkingText: finalThinking || undefined,
           tools:
             Object.keys(streaming.tools).length > 0
               ? { ...streaming.tools }

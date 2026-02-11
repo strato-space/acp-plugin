@@ -21,7 +21,7 @@ Canonical references for `agent_servers`:
 - ACP Python SDK quickstart: https://github.com/agentclientprotocol/python-sdk/blob/main/docs/quickstart.md
 
 Your agent settings are read from both VS Code global settings and Workspace `settings.json`.
-In your current workspace setup, workspace settings are read from `/home/user/workspace/.vscode/settings.json`.
+Workspace settings are resolved from the opened workspace root(s), for example `/home/.vscode/settings.json` when the workspace root is `/home`.
 Built-in default agent presets are defined in repo file `src/acp/agents.ts`, bundled into the extension VSIX, and are not edited directly in the installed plugin files.
 Parameter `acp.includeBuiltInAgents` (default `true`) defines whether these built-in presets are included alongside custom agents. For scalar settings, workspace values override global values.
 If custom agents do not appear, check that your settings use `agent_servers` (or `acp.agents`). The legacy key `acp.agentServers` is deprecated and ignored by current builds.
@@ -33,6 +33,7 @@ ACP Plugin ships with a set of built-in agent presets (you can override any of t
 | ID | Name | Default command |
 |----|------|-----------------|
 | `codex` | Codex CLI | `npx --yes @zed-industries/codex-acp@latest` |
+| `fast-agent-acp` | Fast Agent ACP | `uvx fast-agent-acp --model codex` |
 | `github-copilot` | GitHub Copilot | `npx --yes @github/copilot-language-server@latest --acp` |
 | `claude-code` | Claude Code | `npx --yes @zed-industries/claude-code-acp@latest` |
 | `gemini` | Gemini CLI | `npx --yes @google/gemini-cli@latest --experimental-acp` |
@@ -45,6 +46,7 @@ Notes:
 
 - These are just defaults, not endorsements. Some agents require separate auth/login steps.
 - `npx` requires Node.js to be installed and accessible on `PATH` (especially important for Remote-SSH hosts).
+- For Fast Agent ACP, the default model is `codex`. The CLI help does not expose a stable "list models" command; model choices come from ACP session metadata when the agent provides them.
 
 ### Quick Start (VS Code)
 

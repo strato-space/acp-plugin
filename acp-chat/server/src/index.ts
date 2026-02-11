@@ -335,7 +335,12 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
 
       send(ctx.ws, {
         type: "agents",
-        agents: agents.map((a) => ({ id: a.id, name: a.name, available: a.available })),
+        agents: agents.map((a) => ({
+          id: a.id,
+          name: a.name,
+          available: a.available,
+          source: a.source,
+        })),
         selected,
       });
       send(ctx.ws, { type: "sessionMetadata", modes: null, models: null, commands: null });
@@ -550,7 +555,12 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/agents", (_req, res) => {
   const agents = getAgentsWithStatus();
   res.json({
-    agents: agents.map((a) => ({ id: a.id, name: a.name, available: a.available })),
+    agents: agents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      available: a.available,
+      source: a.source,
+    })),
   });
 });
 

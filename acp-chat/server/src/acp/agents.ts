@@ -30,6 +30,7 @@ export interface AgentConfig {
 
 export interface AgentWithStatus extends AgentConfig {
   available: boolean;
+  source: "builtin" | "custom";
 }
 
 // Built-in agents. Users can add/override these via VS Code settings.
@@ -39,6 +40,12 @@ export const AGENTS: AgentConfig[] = [
     name: "Codex CLI",
     command: "npx",
     args: ["--yes", "@zed-industries/codex-acp@latest"],
+  },
+  {
+    id: "fast-agent-acp",
+    name: "Fast Agent ACP",
+    command: "uvx",
+    args: ["fast-agent-acp", "--model", "codex"],
   },
   {
     id: "github-copilot",
@@ -108,14 +115,20 @@ export function setCustomAgents(options: {
   cachedAgentsWithStatus = null;
 }
 
-function getEffectiveAgents(): AgentConfig[] {
-  const merged = new Map<string, AgentConfig>();
+type EffectiveAgent = AgentConfig & { source: "builtin" | "custom" };
+
+function getEffectiveAgents(): EffectiveAgent[] {
+  const merged = new Map<string, EffectiveAgent>();
 
   if (includeBuiltins) {
-    for (const agent of AGENTS) merged.set(agent.id, agent);
+    for (const agent of AGENTS) {
+      merged.set(agent.id, { ...agent, source: "builtin" });
+    }
   }
 
-  for (const agent of customAgents) merged.set(agent.id, agent);
+  for (const agent of customAgents) {
+    merged.set(agent.id, { ...agent, source: "custom" });
+  }
 
   return [...merged.values()];
 }
@@ -169,6 +182,7 @@ export function getAgentsWithStatus(forceRefresh = false): AgentWithStatus[] {
   cachedAgentsWithStatus = effectiveAgents.map((agent) => ({
     ...agent,
     available: isCommandAvailable(agent.command),
+    source: agent.source,
   }));
 
   return cachedAgentsWithStatus;

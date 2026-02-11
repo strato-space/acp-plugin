@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "@/store";
 import { useVsCodeApi } from "@/hooks/useVsCodeApi";
@@ -100,6 +100,11 @@ export function SettingsDropdown() {
   const hasModels = models.length > 0;
   const hasAgents = agents.length > 0;
   const agentValue = selectedAgentId || "";
+  const groupedAgents = useMemo(() => {
+    const builtIn = agents.filter((a) => a.source === "builtin");
+    const custom = agents.filter((a) => a.source === "custom");
+    return { builtIn, custom };
+  }, [agents]);
 
   const modeLabel = useCallback(
     (mode: { id: string; name?: string | null }) => {
@@ -160,19 +165,43 @@ export function SettingsDropdown() {
             disabled={!hasAgents}
           >
             {hasAgents ? (
-              agents.map((agent) => (
-                <option
-                  key={agent.id}
-                  value={agent.id}
-                  style={{
-                    color: agent.available
-                      ? undefined
-                      : "var(--vscode-disabledForeground)",
-                  }}
-                >
-                  {agent.available ? agent.name : `${agent.name} (not installed)`}
-                </option>
-              ))
+              <>
+                {(groupedAgents.builtIn.length > 0
+                  ? groupedAgents.builtIn
+                  : agents
+                ).map((agent) => (
+                  <option
+                    key={agent.id}
+                    value={agent.id}
+                    style={{
+                      color: agent.available
+                        ? undefined
+                        : "var(--vscode-disabledForeground)",
+                    }}
+                  >
+                    {agent.available ? agent.name : `${agent.name} (not installed)`}
+                  </option>
+                ))}
+                {groupedAgents.builtIn.length > 0 &&
+                  groupedAgents.custom.length > 0 && (
+                    <option disabled value="__separator__">
+                      ────────────
+                    </option>
+                  )}
+                {groupedAgents.custom.map((agent) => (
+                  <option
+                    key={agent.id}
+                    value={agent.id}
+                    style={{
+                      color: agent.available
+                        ? undefined
+                        : "var(--vscode-disabledForeground)",
+                    }}
+                  >
+                    {agent.available ? agent.name : `${agent.name} (not installed)`}
+                  </option>
+                ))}
+              </>
             ) : agentValue ? (
               <option value={agentValue}>{agentValue}</option>
             ) : (

@@ -29,6 +29,7 @@ interface StoredMessage {
   type: "user" | "assistant" | "error" | "system";
   text: string;
   html?: string;
+  thinkingText?: string;
   timestamp: number;
   attachments?: Attachment[];
   tools?: Record<string, unknown>;
@@ -249,6 +250,7 @@ export class ChatPanelManager {
         id: a.id,
         name: a.name,
         available: a.available,
+        source: a.source,
       })),
       selected: ctx.acpClient.getAgentId(),
     });
@@ -676,6 +678,7 @@ export class ChatPanelManager {
           id: a.id,
           name: a.name,
           available: a.available,
+          source: a.source,
         })),
         selected: ctx.acpClient.getAgentId(),
       });

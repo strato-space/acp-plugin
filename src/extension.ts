@@ -192,24 +192,46 @@ type ExternalSettingsLoadResult = {
 };
 
 function tryLoadExternalSettings(): ExternalSettingsLoadResult {
-  const candidates: Array<{ path: string; scope: "global" | "workspace" }> = [
-    {
-      path: path.join(os.homedir(), ".vscode", "settings.json"),
-      scope: "global",
-    },
-    // Remote-SSH / server-side VS Code settings.
-    {
-      path: path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
-      scope: "global",
-    },
-    {
-      path: path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
-      scope: "global",
-    },
-    // Common shared workspace setup in this environment.
-    { path: "/home/strato-space/.vscode/settings.json", scope: "workspace" },
-    { path: "/home/user/workspace/.vscode/settings.json", scope: "workspace" },
-  ];
+  const candidates: Array<{ path: string; scope: "global" | "workspace" }> = [];
+  const seenCandidates = new Set<string>();
+  const pushCandidate = (candidate: {
+    path: string;
+    scope: "global" | "workspace";
+  }) => {
+    const normalizedPath = path.normalize(candidate.path);
+    const key = `${candidate.scope}:${normalizedPath}`;
+    if (seenCandidates.has(key)) return;
+    seenCandidates.add(key);
+    candidates.push({ ...candidate, path: normalizedPath });
+  };
+
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode", "settings.json"),
+    scope: "global",
+  });
+  // Remote-SSH / server-side VS Code settings.
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode-server", "data", "Machine", "settings.json"),
+    scope: "global",
+  });
+  pushCandidate({
+    path: path.join(os.homedir(), ".vscode-server", "data", "User", "settings.json"),
+    scope: "global",
+  });
+
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    pushCandidate({
+      path: path.join(folder.uri.fsPath, ".vscode", "settings.json"),
+      scope: "workspace",
+    });
+  }
+  const workspaceFilePath = vscode.workspace.workspaceFile?.fsPath;
+  if (workspaceFilePath) {
+    pushCandidate({
+      path: path.join(path.dirname(workspaceFilePath), ".vscode", "settings.json"),
+      scope: "workspace",
+    });
+  }
 
   const globalServers: Record<string, AgentServerSetting> = {};
   const workspaceServers: Record<string, AgentServerSetting> = {};

@@ -33,6 +33,18 @@ suite("agents", () => {
       assert.ok(claude, "claude-code agent should exist");
       assert.strictEqual(claude?.command, "npx");
     });
+
+    test("should include fast-agent-acp as second built-in agent", () => {
+      const fastAgent = AGENTS.find((a) => a.id === "fast-agent-acp");
+      assert.ok(fastAgent, "fast-agent-acp agent should exist");
+      assert.strictEqual(AGENTS[1]?.id, "fast-agent-acp");
+      assert.strictEqual(fastAgent?.command, "uvx");
+      assert.deepStrictEqual(fastAgent?.args, [
+        "fast-agent-acp",
+        "--model",
+        "codex",
+      ]);
+    });
   });
 
   suite("getAgent", () => {
@@ -52,7 +64,7 @@ suite("agents", () => {
   suite("getDefaultAgent", () => {
     test("should return first agent as default", () => {
       const defaultAgent = getDefaultAgent();
-      assert.strictEqual(defaultAgent, AGENTS[0]);
+      assert.strictEqual(defaultAgent.id, AGENTS[0].id);
     });
 
     test("should return codex as default", () => {
