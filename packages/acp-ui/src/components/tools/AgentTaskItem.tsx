@@ -2,12 +2,7 @@ import { memo, useMemo } from "react";
 import type { Tool } from "@/types";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/store";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Bot,
-} from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Bot } from "lucide-react";
 import { ToolItem } from "./ToolItem";
 import { IOFrame } from "./IOFrame";
 import {
@@ -55,7 +50,8 @@ export const AgentTaskItem = memo(function AgentTaskItem({
   }, [tool.subTools]);
 
   const subToolStats = useMemo(() => {
-    if (!tool.subTools) return { total: 0, running: 0, completed: 0, failed: 0 };
+    if (!tool.subTools)
+      return { total: 0, running: 0, completed: 0, failed: 0 };
     const tools = Object.values(tool.subTools);
     return {
       total: tools.length,
@@ -98,7 +94,7 @@ export const AgentTaskItem = memo(function AgentTaskItem({
       else if (t.status === "failed") failed += 1;
     }
     return (
-      <span className="flex items-center gap-1.5">
+      <span className="flex items-center justify-end gap-1.5 flex-wrap">
         {toolCount > 0 ? (
           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-foreground border border-border text-[10px]">
             {toolCount} tool{toolCount !== 1 ? "s" : ""}
@@ -163,7 +159,9 @@ export const AgentTaskItem = memo(function AgentTaskItem({
           <div className="px-3 pb-2">
             <IOFrame
               title="Input"
-              icon={<ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={parsedInput}
             >
               <ToolInput input={parsedInput} className="px-0 pb-0" />
@@ -196,7 +194,9 @@ export const AgentTaskItem = memo(function AgentTaskItem({
           <div className="px-3 pb-3">
             <IOFrame
               title="Output"
-              icon={<ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={truncatedOutput}
             >
               <ToolOutput output={truncatedOutput} className="px-0 pb-0" />

@@ -35,7 +35,11 @@ export type ToolFrameProps = ToolProps & {
   variant?: ToolVariant;
 };
 
-export const Tool = ({ className, variant = "frame", ...props }: ToolFrameProps) => (
+export const Tool = ({
+  className,
+  variant = "frame",
+  ...props
+}: ToolFrameProps) => (
   <Collapsible
     data-variant={variant}
     className={cn(
@@ -60,7 +64,10 @@ export type ToolHeaderProps = {
 };
 
 const getStatusBadge = (status: ToolState) => {
-  const config: Record<ToolState, { label: string; icon: ReactNode; className?: string }> = {
+  const config: Record<
+    ToolState,
+    { label: string; icon: ReactNode; className?: string }
+  > = {
     pending: {
       label: "Pending",
       icon: <CircleIcon className="size-3" />,
@@ -123,14 +130,16 @@ export const ToolHeader = ({
   <CollapsibleTrigger
     className={cn(
       // Keep header geometry stable between collapsed/expanded states.
-      "group flex w-full min-h-10 items-center justify-between gap-3 p-2.5 cursor-pointer",
+      "group flex w-full min-h-10 items-start sm:items-center justify-between gap-2 p-2.5 cursor-pointer",
       className
     )}
     {...props}
   >
     <div className="flex items-center gap-2 min-w-0 overflow-hidden">
       <span className="shrink-0">
-        {icon ?? <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />}
+        {icon ?? (
+          <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
+        )}
       </span>
       <span
         className="font-medium text-sm truncate"
@@ -139,8 +148,8 @@ export const ToolHeader = ({
         {title ?? name ?? "Tool"}
       </span>
     </div>
-    <div className="flex items-center gap-2 shrink-0 self-center">
-      {afterTitle ? <span className="shrink-0">{afterTitle}</span> : null}
+    <div className="flex items-center justify-end gap-2 min-w-0 self-center flex-wrap">
+      {afterTitle ? <span className="min-w-0">{afterTitle}</span> : null}
       {showStatusBadge ? getStatusBadge(state) : null}
       <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
     </div>
@@ -166,10 +175,14 @@ export type ToolInputProps = ComponentProps<"div"> & {
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => {
   if (!input) return null;
 
-  const displayInput = typeof input === "string" ? input : JSON.stringify(input, null, 2);
+  const displayInput =
+    typeof input === "string" ? input : JSON.stringify(input, null, 2);
 
   return (
-    <div className={cn("space-y-1.5 overflow-hidden px-3 pb-2", className)} {...props}>
+    <div
+      className={cn("space-y-1.5 overflow-hidden px-3 pb-2", className)}
+      {...props}
+    >
       <h4 className="font-medium text-muted-foreground text-[10px] uppercase tracking-wider">
         Input
       </h4>
@@ -195,7 +208,8 @@ export const ToolOutput = ({
     return null;
   }
 
-  const displayOutput = typeof output === "string" ? output : JSON.stringify(output, null, 2);
+  const displayOutput =
+    typeof output === "string" ? output : JSON.stringify(output, null, 2);
 
   return (
     <div className={cn("space-y-1.5 px-3 pb-3", className)} {...props}>

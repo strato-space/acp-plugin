@@ -41,6 +41,7 @@ suite("agents", () => {
       assert.strictEqual(fastAgent?.command, "uvx");
       assert.deepStrictEqual(fastAgent?.args, [
         "fast-agent-acp",
+        "--shell",
         "--model",
         "codex",
       ]);

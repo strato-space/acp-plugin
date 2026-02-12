@@ -45,7 +45,7 @@ export const AGENTS: AgentConfig[] = [
     id: "fast-agent-acp",
     name: "Fast Agent ACP",
     command: "uvx",
-    args: ["fast-agent-acp", "--model", "codex"],
+    args: ["fast-agent-acp", "--shell", "--model", "codex"],
   },
   {
     id: "github-copilot",

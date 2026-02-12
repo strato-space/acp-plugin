@@ -47,7 +47,7 @@ export const MessageBubble = memo(function MessageBubble({
   if (message.type === "error") {
     return (
       <div
-        className="mx-auto w-full max-w-thread px-2 py-4 animate-slide-in"
+        className="mx-auto w-full max-w-thread px-1 sm:px-2 py-4 animate-slide-in"
         role="article"
         aria-label="Error message"
       >
@@ -62,7 +62,7 @@ export const MessageBubble = memo(function MessageBubble({
   if (message.type === "system") {
     return (
       <div
-        className="mx-auto w-full max-w-thread px-2 py-2 animate-slide-in"
+        className="mx-auto w-full max-w-thread px-1 sm:px-2 py-2 animate-slide-in"
         role="article"
         aria-label="System message"
       >
@@ -79,7 +79,7 @@ export const MessageBubble = memo(function MessageBubble({
 
     return (
       <div
-        className="mx-auto grid w-full max-w-thread grid-cols-[minmax(72px,1fr)_auto] gap-y-2 px-2 py-4 animate-slide-in first:mt-3 last:mb-5"
+        className="mx-auto grid w-full max-w-thread grid-cols-[minmax(32px,1fr)_auto] sm:grid-cols-[minmax(72px,1fr)_auto] gap-y-2 px-1 sm:px-2 py-4 animate-slide-in first:mt-3 last:mb-5"
         role="article"
         aria-label="Your message"
         onContextMenu={handleContextMenu}
@@ -160,7 +160,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <div
-      className="mx-auto w-full max-w-thread px-2 py-4 animate-slide-in last:mb-24"
+      className="mx-auto w-full max-w-thread px-1 sm:px-2 py-4 animate-slide-in last:mb-24"
       role="article"
       aria-label="Agent response"
       onContextMenu={handleContextMenu}
@@ -172,9 +172,12 @@ export const MessageBubble = memo(function MessageBubble({
           state={frameState}
           inputText={inputText}
           thinkingText={message.thinkingText ?? null}
-          tools={message.tools && Object.keys(message.tools).length > 0 ? message.tools : null}
+          tools={
+            message.tools && Object.keys(message.tools).length > 0
+              ? message.tools
+              : null
+          }
           outputText={message.text}
-          defaultOpen={!!(message.tools && Object.keys(message.tools).length > 0)}
         />
 
         {message.html ? (

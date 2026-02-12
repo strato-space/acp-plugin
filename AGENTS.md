@@ -4,7 +4,7 @@
 
 - `src/`: VS Code extension host (TypeScript). Entry point: `src/extension.ts`.
 - `src/views/webview/`: React + Vite webview entry (bundled into the extension).
-- `packages/acp-ui/`: shared React UI + Zustand store + types (used by both the webview and `acp-chat`).
+- `packages/acp-ui/`: shared React UI + Zustand store + types (used by both the webview and `acp-chat`, and treated as source of truth for chat UI behavior).
 - `acp-chat/`: standalone web UI + server bridge (Express + WS) for `agents-dev.stratospace.fun`.
 - `src/test/`: extension tests (`*.test.ts`) executed in an Extension Host.
 - `e2e/`: Playwright E2E tests (`*.spec.ts`).
@@ -20,6 +20,7 @@
 - `npm run package`: production build (used by `vsce` packaging).
 - `npx vsce package --no-dependencies`: create a `.vsix` for manual install/testing.
 - `npm --prefix acp-chat ci && npm --prefix acp-chat run build`: build the standalone web UI + server bridge.
+- `npm run test:webview:unit`: run unit tests for shared UI logic (tool visibility and similar pure logic).
 
 Tip: In VS Code, use the "Run Extension" and "Extension Tests" launch configs
 (`.vscode/launch.json`).
@@ -109,6 +110,7 @@ code --uninstall-extension cosmosjeon.nexus-acp
 ## Testing Guidelines
 
 - Extension tests live in `src/test/*.test.ts` and run via `npm test` (VS Code test host).
+- Shared webview UI unit tests run via `npm run test:webview:unit`.
 - Coverage: `npm run coverage` writes reports to `coverage/` (CI uploads + summarizes this).
 - E2E: Playwright tests live in `e2e/*.spec.ts` and run via `npm run test:e2e` (use
   `test:e2e:headed` / `test:e2e:debug` when debugging).
@@ -121,6 +123,13 @@ code --uninstall-extension cosmosjeon.nexus-acp
 Manual MCP smoke runbook (LLM-driven UI checks):
 
 - `e2e/mode-b-mcp.md`
+
+## UI Behavior Invariants
+
+- Default collapsed tool view shows the 5 most recent regular tool calls (task/agent rows remain visible).
+- `Show more` / `Show less` for tool lists is treated as a sticky user preference and applies to subsequent assistant frames.
+- Main run-frame collapse/expand state is sticky and applies to subsequent assistant frames.
+- Keep layouts usable at narrow widths (at least iPhone XR class viewport) and avoid horizontal overflow regressions.
 
 ## Security & Configuration Tips
 

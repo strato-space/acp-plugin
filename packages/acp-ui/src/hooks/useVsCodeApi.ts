@@ -11,6 +11,16 @@ import { useChatStore } from "../store";
 import { detectToolKindFromName } from "@/lib/ansi";
 import type { Model } from "../types";
 
+export type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
+
+export const REASONING_OPTIONS: Array<{ id: ReasoningLevel; name: string }> = [
+  { id: "system", name: "System Default" },
+  { id: "minimal", name: "Minimal" },
+  { id: "low", name: "Low" },
+  { id: "medium", name: "Medium" },
+  { id: "high", name: "High" },
+];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -42,15 +52,15 @@ function safeJsonStringify(value: unknown): string | null {
 }
 
 const FAST_AGENT_FALLBACK_MODELS: Model[] = [
-  { modelId: "codex", name: "codex (gpt-5.2-codex)" },
-  { modelId: "codexplan", name: "codexplan (gpt-5.3-codex)" },
-  { modelId: "claude-opus-4-6", name: "claude-opus-4-6" },
-  { modelId: "sonnet", name: "sonnet (claude-sonnet-4-5)" },
-  { modelId: "gemini25pro", name: "gemini25pro (gemini-2.5-pro)" },
-  { modelId: "deepseek32", name: "deepseek32 (DeepSeek-V3.2)" },
-  { modelId: "qwen3", name: "qwen3 (Qwen3-Next-80B-A3B-Instruct)" },
-  { modelId: "kimi25", name: "kimi25 (Kimi-K2.5)" },
-  { modelId: "gpt52", name: "gpt52 (gpt-5.2)" },
+  { modelId: "codexplan", name: "codexplan: gpt-5.3-codex" },
+  { modelId: "codex", name: "codex: gpt-5.2-codex" },
+  { modelId: "claude-opus-4-6", name: "claude-opus-4-6: claude-opus-4-6" },
+  { modelId: "sonnet", name: "sonnet: claude-sonnet-4-5" },
+  { modelId: "gemini25pro", name: "gemini25pro: gemini-2.5-pro" },
+  { modelId: "deepseek32", name: "deepseek32: DeepSeek-V3.2" },
+  { modelId: "qwen3", name: "qwen3: Qwen3-Next-80B-A3B-Instruct" },
+  { modelId: "kimi25", name: "kimi25: Kimi-K2.5" },
+  { modelId: "gpt52", name: "gpt52: gpt-5.2" },
 ];
 
 function isFastAgentSelected(
@@ -65,9 +75,60 @@ function isFastAgentSelected(
   return selected.name.toLowerCase().includes("fast agent");
 }
 
-function resolveFallbackModelId(currentModelId: string | null | undefined): string {
-  const preferred = (currentModelId || "").trim();
-  if (preferred && FAST_AGENT_FALLBACK_MODELS.some((m) => m.modelId === preferred)) {
+function isCodexSelected(
+  selectedAgentId: string | null | undefined,
+  agents: Array<{ id: string; name: string }>
+): boolean {
+  const id = (selectedAgentId || "").trim().toLowerCase();
+  if (!id) return false;
+  if (id === "codex") return true;
+  const selected = agents.find((a) => a.id.toLowerCase() === id);
+  if (!selected) return false;
+  return selected.name.toLowerCase().includes("codex");
+}
+
+function normalizeFastAgentModelId(modelId: string | null | undefined): string {
+  const raw = (modelId || "").trim();
+  if (!raw) return "";
+  const q = raw.indexOf("?");
+  if (q === -1) return raw;
+  try {
+    const base = raw.slice(0, q);
+    const params = new URLSearchParams(raw.slice(q + 1));
+    params.delete("reasoning");
+    const rest = params.toString();
+    return rest ? `${base}?${rest}` : base;
+  } catch {
+    return raw.slice(0, q);
+  }
+}
+
+function modelSupportsReasoning(modelId: string | null | undefined): boolean {
+  const normalized = normalizeFastAgentModelId(modelId).toLowerCase();
+  if (!normalized) return false;
+  return /(codex|gpt|o[134]\b|claude|sonnet|opus|gemini)/i.test(normalized);
+}
+
+export function shouldShowReasoningControl(
+  selectedAgentId: string | null | undefined,
+  agents: Array<{ id: string; name: string }>,
+  currentModelId: string | null | undefined
+): boolean {
+  if (isCodexSelected(selectedAgentId, agents)) return true;
+  if (isFastAgentSelected(selectedAgentId, agents)) {
+    return modelSupportsReasoning(currentModelId);
+  }
+  return false;
+}
+
+function resolveFallbackModelId(
+  currentModelId: string | null | undefined
+): string {
+  const preferred = normalizeFastAgentModelId(currentModelId);
+  if (
+    preferred &&
+    FAST_AGENT_FALLBACK_MODELS.some((m) => m.modelId === preferred)
+  ) {
     return preferred;
   }
   return FAST_AGENT_FALLBACK_MODELS[0]?.modelId ?? "";
@@ -202,10 +263,17 @@ export function useVsCodeInit() {
   const selectedAgentId = useChatStore((state) => state.selectedAgentId);
   const currentModeId = useChatStore((state) => state.currentModeId);
   const currentModelId = useChatStore((state) => state.currentModelId);
+  const currentReasoningId = useChatStore((state) => state.currentReasoningId);
   const collapsedAgentIds = useChatStore((state) => state.collapsedAgentIds);
   const sidebarOpen = useChatStore((state) => state.sidebarOpen);
   const hierarchyStyle = useChatStore((state) => state.hierarchyStyle);
   const settingsOpen = useChatStore((state) => state.settingsOpen);
+  const runFrameOpenByDefault = useChatStore(
+    (state) => state.runFrameOpenByDefault
+  );
+  const toolListShowAllByDefault = useChatStore(
+    (state) => state.toolListShowAllByDefault
+  );
 
   // Stream chunk buffer for throttling
   const streamBufferRef = useRef<string>("");
@@ -239,7 +307,7 @@ export function useVsCodeInit() {
   const saveState = useCallback(() => {
     const stateNow = useChatStore.getState();
     const state: WebviewState = {
-      schemaVersion: 6,
+      schemaVersion: 8,
       isConnected: connectionState === "connected",
       inputValue: inputValue,
       collapsedAgentIds,
@@ -250,6 +318,9 @@ export function useVsCodeInit() {
       selectedAgentId: stateNow.selectedAgentId ?? null,
       currentModeId: stateNow.currentModeId ?? null,
       currentModelId: stateNow.currentModelId ?? null,
+      currentReasoningId: stateNow.currentReasoningId ?? null,
+      runFrameOpenByDefault: stateNow.runFrameOpenByDefault,
+      toolListShowAllByDefault: stateNow.toolListShowAllByDefault,
     };
     vscode.setState(state);
   }, [
@@ -261,7 +332,10 @@ export function useVsCodeInit() {
     selectedAgentId,
     currentModeId,
     currentModelId,
+    currentReasoningId,
     hierarchyStyle,
+    runFrameOpenByDefault,
+    toolListShowAllByDefault,
   ]);
 
   const restoreState = useCallback((): WebviewState | undefined => {
@@ -281,14 +355,37 @@ export function useVsCodeInit() {
       if (typeof state.settingsOpen === "boolean") {
         getActions().setSettingsOpen(state.settingsOpen);
       }
-      if (typeof state.selectedAgentId === "string" && state.selectedAgentId.trim()) {
+      if (
+        typeof state.selectedAgentId === "string" &&
+        state.selectedAgentId.trim()
+      ) {
         getActions().setSelectedAgent(state.selectedAgentId.trim());
       }
-      if (typeof state.currentModeId === "string" && state.currentModeId.trim()) {
+      if (
+        typeof state.currentModeId === "string" &&
+        state.currentModeId.trim()
+      ) {
         getActions().setCurrentMode(state.currentModeId.trim());
       }
-      if (typeof state.currentModelId === "string" && state.currentModelId.trim()) {
+      if (
+        typeof state.currentModelId === "string" &&
+        state.currentModelId.trim()
+      ) {
         getActions().setCurrentModel(state.currentModelId.trim());
+      }
+      if (
+        typeof state.currentReasoningId === "string" &&
+        state.currentReasoningId.trim()
+      ) {
+        getActions().setCurrentReasoning(state.currentReasoningId.trim());
+      }
+      if (typeof state.runFrameOpenByDefault === "boolean") {
+        getActions().setRunFrameOpenByDefault(state.runFrameOpenByDefault);
+      }
+      if (typeof state.toolListShowAllByDefault === "boolean") {
+        getActions().setToolListShowAllByDefault(
+          state.toolListShowAllByDefault
+        );
       }
       return state;
     }
@@ -327,7 +424,10 @@ export function useVsCodeInit() {
           break;
 
         case "userMessage":
-          if ((msg.text && !isConnectNoiseBanner(msg.text)) || msg.attachments?.length) {
+          if (
+            (msg.text && !isConnectNoiseBanner(msg.text)) ||
+            msg.attachments?.length
+          ) {
             actions.addMessage({
               type: "user",
               text: msg.text || "",
@@ -348,7 +448,9 @@ export function useVsCodeInit() {
             if (!streamTimeoutRef.current) {
               streamTimeoutRef.current = window.setTimeout(() => {
                 if (streamBufferRef.current) {
-                  streamBufferRef.current = stripConnectNoiseBanners(streamBufferRef.current);
+                  streamBufferRef.current = stripConnectNoiseBanners(
+                    streamBufferRef.current
+                  );
                   console.log(
                     `[DEBUG] Flushing streamChunk: ${streamBufferRef.current.length} chars`
                   );
@@ -396,7 +498,9 @@ export function useVsCodeInit() {
             streamTimeoutRef.current = null;
           }
           if (streamBufferRef.current) {
-            streamBufferRef.current = stripConnectNoiseBanners(streamBufferRef.current);
+            streamBufferRef.current = stripConnectNoiseBanners(
+              streamBufferRef.current
+            );
             if (streamBufferRef.current.trim()) {
               actions.appendStreamChunk(streamBufferRef.current);
             }
@@ -408,7 +512,9 @@ export function useVsCodeInit() {
             thinkingTimeoutRef.current = null;
           }
           if (thinkingBufferRef.current) {
-            thinkingBufferRef.current = stripConnectNoiseBanners(thinkingBufferRef.current);
+            thinkingBufferRef.current = stripConnectNoiseBanners(
+              thinkingBufferRef.current
+            );
             if (thinkingBufferRef.current.trim()) {
               actions.appendThinkingChunk(thinkingBufferRef.current);
             }
@@ -459,7 +565,9 @@ export function useVsCodeInit() {
           }
 
           const maybeHtml =
-            typeof msg.html === "string" ? stripConnectNoiseBanners(msg.html) : msg.html;
+            typeof msg.html === "string"
+              ? stripConnectNoiseBanners(msg.html)
+              : msg.html;
           actions.endStreaming(maybeHtml);
           break;
 
@@ -811,7 +919,9 @@ export function useVsCodeInit() {
               );
               const currentModelId = resolveCurrentModelId(
                 mergedModels,
-                msg.models.currentModelId || stateNow.currentModelId
+                normalizeFastAgentModelId(
+                  msg.models.currentModelId || stateNow.currentModelId
+                )
               );
               actions.setModels(mergedModels, currentModelId);
             } else {
@@ -824,10 +934,12 @@ export function useVsCodeInit() {
             if (fastAgentSelected) {
               const currentModelId = resolveCurrentModelId(
                 FAST_AGENT_FALLBACK_MODELS,
-                (typeof msg.models?.currentModelId === "string" &&
-                msg.models.currentModelId.trim()
-                  ? msg.models.currentModelId.trim()
-                  : stateNow.currentModelId) || ""
+                normalizeFastAgentModelId(
+                  (typeof msg.models?.currentModelId === "string" &&
+                  msg.models.currentModelId.trim()
+                    ? msg.models.currentModelId.trim()
+                    : stateNow.currentModelId) || ""
+                )
               );
               actions.setModels(
                 FAST_AGENT_FALLBACK_MODELS,
@@ -835,11 +947,20 @@ export function useVsCodeInit() {
               );
             }
           }
+          if (typeof msg.reasoningId === "string" && msg.reasoningId.trim()) {
+            actions.setCurrentReasoning(msg.reasoningId.trim());
+          }
           if (msg.commands) {
             actions.setAvailableCommands(msg.commands);
           }
           break;
         }
+
+        case "reasoningUpdate":
+          if (typeof msg.reasoningId === "string" && msg.reasoningId.trim()) {
+            actions.setCurrentReasoning(msg.reasoningId.trim());
+          }
+          break;
 
         case "modeUpdate":
           if (msg.modeId) {
@@ -922,16 +1043,24 @@ export function useVsCodeInit() {
     postMessage({
       type: "ready",
       agentId:
-        typeof restored?.selectedAgentId === "string" && restored.selectedAgentId.trim()
+        typeof restored?.selectedAgentId === "string" &&
+        restored.selectedAgentId.trim()
           ? restored.selectedAgentId.trim()
           : undefined,
       modeId:
-        typeof restored?.currentModeId === "string" && restored.currentModeId.trim()
+        typeof restored?.currentModeId === "string" &&
+        restored.currentModeId.trim()
           ? restored.currentModeId.trim()
           : undefined,
       modelId:
-        typeof restored?.currentModelId === "string" && restored.currentModelId.trim()
+        typeof restored?.currentModelId === "string" &&
+        restored.currentModelId.trim()
           ? restored.currentModelId.trim()
+          : undefined,
+      reasoningId:
+        typeof restored?.currentReasoningId === "string" &&
+        restored.currentReasoningId.trim()
+          ? restored.currentReasoningId.trim()
           : undefined,
     });
   }, []);
@@ -1044,6 +1173,8 @@ export function useVsCodeApi() {
         postMessage({ type: "selectMode", modeId }),
       selectModel: (modelId: string) =>
         postMessage({ type: "selectModel", modelId }),
+      selectReasoning: (reasoningId: string) =>
+        postMessage({ type: "selectReasoning", reasoningId }),
       copyMessage: (text: string) => postMessage({ type: "copyMessage", text }),
       newChat: () => {
         // Create a new session locally before sending to extension

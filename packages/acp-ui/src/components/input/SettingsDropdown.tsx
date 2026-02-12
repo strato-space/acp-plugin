@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "@/store";
-import { useVsCodeApi } from "@/hooks/useVsCodeApi";
+import {
+  REASONING_OPTIONS,
+  shouldShowReasoningControl,
+  useVsCodeApi,
+} from "@/hooks/useVsCodeApi";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -21,9 +25,11 @@ export function SettingsDropdown() {
     currentModeId,
     models,
     currentModelId,
+    currentReasoningId,
   } = useChatStore();
 
-  const { selectAgent, selectMode, selectModel } = useVsCodeApi();
+  const { selectAgent, selectMode, selectModel, selectReasoning } =
+    useVsCodeApi();
 
   const statusLabels: Record<string, string> = {
     disconnected: "Disconnected",
@@ -98,6 +104,11 @@ export function SettingsDropdown() {
 
   const hasModes = modes.length > 0;
   const hasModels = models.length > 0;
+  const showReasoningControl = shouldShowReasoningControl(
+    selectedAgentId,
+    agents,
+    currentModelId
+  );
   const hasAgents = agents.length > 0;
   const agentValue = selectedAgentId || "";
   const groupedAgents = useMemo(() => {
@@ -244,6 +255,26 @@ export function SettingsDropdown() {
               {models.map((model) => (
                 <option key={model.modelId} value={model.modelId}>
                   {model.name || model.modelId}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {showReasoningControl && (
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Reasoning
+            </label>
+            <Select
+              value={currentReasoningId || "system"}
+              onChange={(e) => selectReasoning(e.target.value)}
+              label="Select Reasoning"
+              className="w-full"
+            >
+              {REASONING_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name}
                 </option>
               ))}
             </Select>

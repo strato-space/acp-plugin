@@ -10,12 +10,7 @@ import { IOFrame } from "@/components/tools/IOFrame";
 import { ToolList } from "@/components/tools/ToolList";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/store";
-import {
-  Bot,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Brain,
-} from "lucide-react";
+import { Bot, ArrowDownToLine, ArrowUpFromLine, Brain } from "lucide-react";
 
 export type RunFrameProps = {
   title?: string;
@@ -37,10 +32,14 @@ export const RunFrame = memo(function RunFrame({
   tools,
   outputText,
   expandedToolId,
-  defaultOpen = true,
+  defaultOpen,
   className,
 }: RunFrameProps) {
   const hierarchyStyle = useChatStore((s) => s.hierarchyStyle);
+  const runFrameOpenByDefault = useChatStore((s) => s.runFrameOpenByDefault);
+  const setRunFrameOpenByDefault = useChatStore(
+    (s) => s.setRunFrameOpenByDefault
+  );
 
   const hasTools = !!tools && Object.keys(tools).length > 0;
   const hasThinking = !!thinkingText && thinkingText.trim().length > 0;
@@ -77,7 +76,7 @@ export const RunFrame = memo(function RunFrame({
     );
 
     return (
-      <span className="flex items-center gap-1.5">
+      <span className="flex items-center justify-end gap-1.5 flex-wrap">
         {toolCount > 0 ? (
           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-foreground border border-border text-[10px]">
             {toolCount} tool{toolCount !== 1 ? "s" : ""}
@@ -133,8 +132,16 @@ export const RunFrame = memo(function RunFrame({
 
   if (!showAny) return null;
 
+  const initialOpen =
+    typeof defaultOpen === "boolean" ? defaultOpen : runFrameOpenByDefault;
+
   return (
-    <ToolFrame defaultOpen={defaultOpen} variant={hierarchyStyle} className={cn(className)}>
+    <ToolFrame
+      defaultOpen={initialOpen}
+      onOpenChange={setRunFrameOpenByDefault}
+      variant={hierarchyStyle}
+      className={cn(className)}
+    >
       <ToolHeader
         title={title}
         state={computedState}
@@ -146,7 +153,9 @@ export const RunFrame = memo(function RunFrame({
           {normalizedInput && (
             <IOFrame
               title="Input"
-              icon={<ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={normalizedInput}
               defaultOpen={false}
             >
@@ -170,15 +179,21 @@ export const RunFrame = memo(function RunFrame({
           )}
 
           {hasTools && tools && (
-            <div className="px-2 pr-4 pb-2">
-              <ToolList tools={tools} expandedToolId={expandedToolId} showHeader={false} />
+            <div className="px-1 sm:px-2 sm:pr-4 pb-2">
+              <ToolList
+                tools={tools}
+                expandedToolId={expandedToolId}
+                showHeader={false}
+              />
             </div>
           )}
 
           {outputText && outputText.trim() && (
             <IOFrame
               title="Output"
-              icon={<ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={outputText}
               defaultOpen={false}
             >

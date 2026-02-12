@@ -2,7 +2,7 @@
   "name": "acp-plugin",
   "displayName": "ACP Plugin",
   "description": "ACP client for VS Code. Chat with Agent Client Protocol (ACP) compatible coding agents directly in your editor.",
-  "version": "0.1.28",
+  "version": "0.1.30",
   "license": "Apache-2.0",
   "publisher": "strato-space",
   "icon": "assets/icon.png",
@@ -343,7 +343,8 @@
     "pretest:e2e": "npm run compile",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "test:webview:unit": "tsx --test packages/acp-ui/src/components/tools/toolListVisibility.test.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",

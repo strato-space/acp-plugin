@@ -79,17 +79,28 @@ export const ToolItem = memo(function ToolItem({
       </span>
     );
     return (
-      <span className="flex items-center gap-1.5">
-        {toolCount > 0 ? pill(`${toolCount} tool${toolCount !== 1 ? "s" : ""}`) : null}
-        {agentCount > 0 ? pill(`${agentCount} agent${agentCount !== 1 ? "s" : ""}`) : null}
+      <span className="flex items-center justify-end gap-1.5 flex-wrap">
+        {toolCount > 0
+          ? pill(`${toolCount} tool${toolCount !== 1 ? "s" : ""}`)
+          : null}
+        {agentCount > 0
+          ? pill(`${agentCount} agent${agentCount !== 1 ? "s" : ""}`)
+          : null}
         {running > 0 ? (
           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-[10px]">
             <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
             {running} running
           </span>
         ) : null}
-        {done > 0 ? pill(`${done} done`, "bg-success/10 text-success border-transparent") : null}
-        {failed > 0 ? pill(`${failed} failed`, "border-destructive text-destructive") : null}
+        {done > 0
+          ? pill(
+              `${done} done`,
+              "bg-success/10 text-success border-transparent"
+            )
+          : null}
+        {failed > 0
+          ? pill(`${failed} failed`, "border-destructive text-destructive")
+          : null}
       </span>
     );
   }, [hasChildren, tool.subTools]);
@@ -124,7 +135,9 @@ export const ToolItem = memo(function ToolItem({
           <div className="px-3 pb-2">
             <IOFrame
               title="Input"
-              icon={<ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowDownToLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={parsedInput}
             >
               <ToolInput input={parsedInput} className="px-0 pb-0" />
@@ -135,7 +148,9 @@ export const ToolItem = memo(function ToolItem({
           <div className="px-3 pb-3">
             <IOFrame
               title="Output"
-              icon={<ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />}
+              icon={
+                <ArrowUpFromLine className="size-4 shrink-0 text-muted-foreground" />
+              }
               value={truncatedOutput}
             >
               {showAnsi ? (

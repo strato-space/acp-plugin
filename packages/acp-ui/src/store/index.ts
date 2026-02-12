@@ -135,10 +135,12 @@ interface ChatStore {
   currentModeId: string | null;
   models: Model[];
   currentModelId: string | null;
+  currentReasoningId: string | null;
   setModes: (modes: Mode[], currentId: string) => void;
   setModels: (models: Model[], currentId: string) => void;
   setCurrentMode: (modeId: string) => void;
   setCurrentModel: (modelId: string) => void;
+  setCurrentReasoning: (reasoningId: string) => void;
 
   // Messages
   messages: Message[];
@@ -194,6 +196,10 @@ interface ChatStore {
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
   toggleSettingsOpen: () => void;
+  runFrameOpenByDefault: boolean;
+  setRunFrameOpenByDefault: (open: boolean) => void;
+  toolListShowAllByDefault: boolean;
+  setToolListShowAllByDefault: (showAll: boolean) => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -346,10 +352,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   currentModeId: null,
   models: [],
   currentModelId: null,
+  currentReasoningId: "system",
   setModes: (modes, currentId) => set({ modes, currentModeId: currentId }),
   setModels: (models, currentId) => set({ models, currentModelId: currentId }),
   setCurrentMode: (modeId) => set({ currentModeId: modeId }),
   setCurrentModel: (modelId) => set({ currentModelId: modelId }),
+  setCurrentReasoning: (reasoningId) =>
+    set({ currentReasoningId: reasoningId }),
 
   // Messages
   messages: [],
@@ -670,4 +679,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   toggleSettingsOpen: () =>
     set((state) => ({ settingsOpen: !state.settingsOpen })),
+  runFrameOpenByDefault: true,
+  setRunFrameOpenByDefault: (open) => set({ runFrameOpenByDefault: open }),
+  toolListShowAllByDefault: false,
+  setToolListShowAllByDefault: (showAll) =>
+    set({ toolListShowAllByDefault: showAll }),
 }));

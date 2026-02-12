@@ -10,7 +10,8 @@ export function App() {
   // Initialize VS Code API message handling
   useVsCodeInit();
 
-  const { connectionState, messages, sidebarOpen, setSidebarOpen } = useChatStore();
+  const { connectionState, messages, sidebarOpen, setSidebarOpen } =
+    useChatStore();
 
   const isDisconnected = connectionState === "disconnected";
   const isConnecting = connectionState === "connecting";
@@ -32,7 +33,7 @@ export function App() {
         className={cn(
           "flex-1 flex flex-col h-full transition-all duration-300",
           // Sidebar is `position: fixed`, so use padding instead of margin to keep content centered.
-          sidebarOpen ? "pl-64" : "pl-0"
+          sidebarOpen ? "pl-0 md:pl-64" : "pl-0"
         )}
       >
         {/* Sidebar open button (when closed) */}

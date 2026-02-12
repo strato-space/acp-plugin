@@ -10,6 +10,49 @@ Upstream attribution / prior art:
 - `omercnet/vscode-acp`
 - `zed` (agent_servers format + ACP agent CLIs)
 
+## 2026-02-12
+
+### PROBLEM SOLVED
+
+- 06:40 - Tool-call blocks showed the first five regular tools instead of the freshest ones, so long runs hid the newest activity by default.
+- 06:45 - Run frame collapse state and tool list `Show more/Show less` state reset between responses, forcing users to repeat the same UI actions every turn.
+- 06:50 - Narrow viewport layouts could lose usable width (especially with an open sidebar), reducing readability and causing avoidable wrapping/overflow pressure.
+
+### FEATURE IMPLEMENTED
+
+- 06:55 - Added a sliding tool-call window that keeps task/agent rows visible and shows the five most recent regular tool calls by default.
+- 06:58 - Added sticky UI preferences for run-frame collapsed/expanded state and tool-list `Show more/Show less`, persisted in webview state and reused for subsequent messages.
+- 07:00 - Added shared UI unit tests for tool visibility behavior and wired them into repo scripts.
+- 07:04 - Implemented explicit reasoning control for Codex CLI and Fast Agent ACP (with persisted preference and end-to-end host/server propagation).
+- 07:05 - Enabled Fast Agent ACP shell mode by default in built-in presets (`uvx fast-agent-acp --shell --model codex`) for filesystem/shell-capable flows.
+
+### CHANGES
+
+- 06:55 - Refactored tool visibility logic into `packages/acp-ui/src/components/tools/toolListVisibility.ts` and switched `ToolList` to `getVisibleToolIds(...)` with newest-five behavior.
+- 06:58 - Extended shared store/types and webview state persistence with `runFrameOpenByDefault` and `toolListShowAllByDefault` (`schemaVersion: 8`) in:
+  - `packages/acp-ui/src/store/index.ts`
+  - `packages/acp-ui/src/types.ts`
+  - `packages/acp-ui/src/hooks/useVsCodeApi.ts`
+- 06:59 - Updated run frame behavior so `ToolFrame` open/close preference is remembered and propagated via store (`packages/acp-ui/src/components/chat/RunFrame.tsx`).
+- 07:00 - Improved responsive behavior for narrow screens in shared UI (mobile-safe sidebar offset and tighter chat/input spacing) in:
+  - `packages/acp-ui/src/App.tsx`
+  - `packages/acp-ui/src/components/chat/ChatContainer.tsx`
+  - `packages/acp-ui/src/components/chat/MessageBubble.tsx`
+  - `packages/acp-ui/src/components/chat/StreamingMessage.tsx`
+  - `packages/acp-ui/src/components/input/ChatInput.tsx`
+  - `packages/acp-ui/src/components/ai/tool.tsx`
+- 07:01 - Added shared UI unit test `packages/acp-ui/src/components/tools/toolListVisibility.test.ts` and new script `npm run test:webview:unit` in `package.json`; excluded `*.test.ts` from webview/`acp-chat` web tsconfig builds.
+- 07:03 - Updated documentation for new behavior and workflows in `README.md` and `AGENTS.md`.
+- 07:04 - Added reasoning-selection protocol handling in both extension and web bridge:
+  - VS Code host: `src/views/chatPanel.ts`
+  - acp-chat server: `acp-chat/server/src/index.ts`
+  - UI store/types/hooks/components: `packages/acp-ui/src/store/index.ts`, `packages/acp-ui/src/types.ts`, `packages/acp-ui/src/hooks/useVsCodeApi.ts`, `packages/acp-ui/src/components/input/SettingsDropdown.tsx`, `packages/acp-ui/src/components/layout/OptionsBar.tsx`
+- 07:05 - Updated built-in Fast Agent preset and tests in:
+  - `src/acp/agents.ts`
+  - `acp-chat/server/src/acp/agents.ts`
+  - `src/test/agents.test.ts`
+- 07:06 - Version bump for release packaging: `0.1.29` -> `0.1.30` (`package.json`, `package-lock.json`).
+
 ## 0.1.28 (2026-02-11)
 
 ### UI

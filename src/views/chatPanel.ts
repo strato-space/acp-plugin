@@ -62,6 +62,7 @@ interface WebviewMessage {
     | "selectAgent"
     | "selectMode"
     | "selectModel"
+    | "selectReasoning"
     | "connect"
     | "newChat"
     | "clearChat"
@@ -76,6 +77,7 @@ interface WebviewMessage {
   agentId?: string;
   modeId?: string;
   modelId?: string;
+  reasoningId?: string;
   attachments?: Attachment[];
   session?: StoredSession;
   sessionId?: string;
@@ -85,7 +87,82 @@ const SELECTED_AGENT_STORAGE_KEY = "selectedAgent";
 const SELECTED_MODE_STORAGE_KEY = "selectedMode";
 const SELECTED_MODEL_STORAGE_KEY = "selectedModel";
 const SELECTED_MODEL_AGENT_STORAGE_KEY = "selectedModelAgent";
+const SELECTED_REASONING_STORAGE_KEY = "selectedReasoning";
+const SELECTED_REASONING_AGENT_STORAGE_KEY = "selectedReasoningAgent";
+const LAST_SELECTED_REASONING_STORAGE_KEY = "acp.lastSelectedReasoning";
 const SESSIONS_STORAGE_KEY = "sessions";
+
+type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
+
+function normalizeReasoningLevel(value: string | undefined | null): ReasoningLevel {
+  const v = (value || "").trim().toLowerCase();
+  if (v === "minimal" || v === "low" || v === "medium" || v === "high") return v;
+  return "system";
+}
+
+function isCodexAgent(agent: { id: string; name: string }): boolean {
+  const id = agent.id.toLowerCase();
+  if (id === "codex") return true;
+  return agent.name.toLowerCase().includes("codex");
+}
+
+function isFastAgent(agent: { id: string; name: string }): boolean {
+  const id = agent.id.toLowerCase();
+  if (id === "fast-agent-acp") return true;
+  return agent.name.toLowerCase().includes("fast agent");
+}
+
+function withModelReasoning(modelId: string, reasoning: ReasoningLevel): string {
+  const raw = (modelId || "").trim();
+  if (!raw) return raw;
+  const q = raw.indexOf("?");
+  const base = q === -1 ? raw : raw.slice(0, q);
+  const query = q === -1 ? "" : raw.slice(q + 1);
+  const params = new URLSearchParams(query);
+  if (reasoning === "system") {
+    params.delete("reasoning");
+  } else {
+    params.set("reasoning", reasoning);
+  }
+  const rest = params.toString();
+  return rest ? `${base}?${rest}` : base;
+}
+
+function upsertArg(args: string[], key: string, value: string): string[] {
+  const out = [...args];
+  const eqPrefix = `${key}=`;
+  for (let i = 0; i < out.length; i++) {
+    const a = out[i];
+    if (a === key) {
+      if (i + 1 < out.length) out[i + 1] = value;
+      else out.push(value);
+      return out;
+    }
+    if (a.startsWith(eqPrefix)) {
+      out[i] = `${key}=${value}`;
+      return out;
+    }
+  }
+  out.push(key, value);
+  return out;
+}
+
+function removeCodexReasoningOverride(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "-c" || a === "--config") {
+      const next = args[i + 1];
+      if (typeof next === "string" && next.startsWith("model_reasoning_effort=")) {
+        i += 1;
+        continue;
+      }
+    }
+    if (a.startsWith("model_reasoning_effort=")) continue;
+    out.push(a);
+  }
+  return out;
+}
 
 // 각 패널의 독립적인 상태를 관리하는 컨텍스트
 interface PanelContext {
@@ -137,6 +214,82 @@ export class ChatPanelManager {
       ctx.acpClient.setConnectTimeoutMs(connectTimeoutMs);
       ctx.acpClient.setDefaultWorkingDirectory(defaultWorkingDirectory);
     }
+  }
+
+  private getPanelReasoning(panelKey: string, agentId: string): ReasoningLevel {
+    const scopedReasoning = this.globalState.get<string>(
+      panelStorageKey(panelKey, SELECTED_REASONING_STORAGE_KEY)
+    );
+    const scopedAgent = this.globalState.get<string>(
+      panelStorageKey(panelKey, SELECTED_REASONING_AGENT_STORAGE_KEY)
+    );
+    if (scopedReasoning && scopedAgent === agentId) {
+      return normalizeReasoningLevel(scopedReasoning);
+    }
+    const last = this.globalState.get<string>(LAST_SELECTED_REASONING_STORAGE_KEY);
+    return normalizeReasoningLevel(last);
+  }
+
+  private postReasoning(panelId: string, reasoningId: ReasoningLevel): void {
+    this.postMessageToPanel(panelId, { type: "reasoningUpdate", reasoningId });
+  }
+
+  private getEffectiveModelForSession(
+    panelKey: string,
+    agent: { id: string; name: string },
+    modelId: string
+  ): string {
+    if (!isFastAgent(agent)) return modelId;
+    const reasoning = this.getPanelReasoning(panelKey, agent.id);
+    return withModelReasoning(modelId, reasoning);
+  }
+
+  private getEffectiveAgentConfig(
+    panelKey: string,
+    baseAgent: {
+      id: string;
+      name: string;
+      command: string;
+      args: string[];
+      cwd?: string;
+      env?: Record<string, string>;
+    },
+    preferredModelId?: string | null
+  ) {
+    const reasoning = this.getPanelReasoning(panelKey, baseAgent.id);
+    let args = [...baseAgent.args];
+
+    if (isCodexAgent(baseAgent)) {
+      args = removeCodexReasoningOverride(args);
+      if (reasoning !== "system") {
+        args.push("-c", `model_reasoning_effort=${reasoning}`);
+      }
+    } else if (isFastAgent(baseAgent)) {
+      let modelArgValue = (preferredModelId || "").trim();
+      if (!modelArgValue) {
+        const idx = args.findIndex((a) => a === "--model" || a === "--models");
+        if (idx !== -1 && typeof args[idx + 1] === "string") {
+          modelArgValue = args[idx + 1];
+        }
+      }
+      if (modelArgValue) {
+        const effectiveModel = withModelReasoning(modelArgValue, reasoning);
+        if (args.some((a) => a === "--model" || a === "--models")) {
+          if (args.includes("--model")) {
+            args = upsertArg(args, "--model", effectiveModel);
+          } else {
+            args = upsertArg(args, "--models", effectiveModel);
+          }
+        } else {
+          args.push("--model", effectiveModel);
+        }
+      }
+    }
+
+    return {
+      ...baseAgent,
+      args,
+    };
   }
 
   private expandVars(value: string): string {
@@ -245,6 +398,7 @@ export class ChatPanelManager {
     if (!ctx) return;
 
     const agentsWithStatus = getAgentsWithStatus();
+    const reasoningId = this.getPanelReasoning(ctx.panelKey, ctx.acpClient.getAgentId());
     this.postMessageToPanel(panelId, {
       type: "agents",
       agents: agentsWithStatus.map((a) => ({
@@ -255,6 +409,7 @@ export class ChatPanelManager {
       })),
       selected: ctx.acpClient.getAgentId(),
     });
+    this.postReasoning(panelId, reasoningId);
   }
 
   public hasVisiblePanel(): boolean {
@@ -337,6 +492,12 @@ export class ChatPanelManager {
     const savedAgentId = this.globalState.get<string>(
       panelStorageKey(panelKey, SELECTED_AGENT_STORAGE_KEY)
     );
+    const savedModelId = this.globalState.get<string>(
+      panelStorageKey(panelKey, SELECTED_MODEL_STORAGE_KEY)
+    );
+    const savedModelAgentId = this.globalState.get<string>(
+      panelStorageKey(panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY)
+    );
     const globalLastAgentId = this.globalState.get<string>(
       LAST_SELECTED_AGENT_STORAGE_KEY
     );
@@ -344,17 +505,25 @@ export class ChatPanelManager {
     if (preferredAgentId) {
       const agent = getAgent(preferredAgentId);
       if (agent) {
-        acpClient.setAgent(agent);
+        const preferredModelForAgent =
+          savedModelId && savedModelAgentId === preferredAgentId
+            ? savedModelId
+            : null;
+        acpClient.setAgent(
+          this.getEffectiveAgentConfig(panelKey, agent, preferredModelForAgent)
+        );
         // Seed the panel-scoped key for consistency (this panelKey is ephemeral anyway).
         this.globalState.update(
           panelStorageKey(panelKey, SELECTED_AGENT_STORAGE_KEY),
           preferredAgentId
         );
       } else {
-        acpClient.setAgent(getFirstAvailableAgent());
+        const fallback = getFirstAvailableAgent();
+        acpClient.setAgent(this.getEffectiveAgentConfig(panelKey, fallback));
       }
     } else {
-      acpClient.setAgent(getFirstAvailableAgent());
+      const fallback = getFirstAvailableAgent();
+      acpClient.setAgent(this.getEffectiveAgentConfig(panelKey, fallback));
     }
 
     // PanelContext 생성
@@ -438,6 +607,9 @@ export class ChatPanelManager {
               await this.handleModelChange(panelId, message.modelId);
             }
             break;
+          case "selectReasoning":
+            await this.handleReasoningChange(panelId, message.reasoningId);
+            break;
           case "connect":
             await this.handleConnect(panelId);
             break;
@@ -467,6 +639,11 @@ export class ChatPanelManager {
                 typeof message.modelId === "string"
                   ? message.modelId.trim()
                   : "";
+              const requestedReasoningId = normalizeReasoningLevel(
+                typeof message.reasoningId === "string"
+                  ? message.reasoningId.trim()
+                  : "system"
+              );
 
               // Publish current state immediately.
               this.postMessageToPanel(panelId, {
@@ -521,6 +698,20 @@ export class ChatPanelManager {
                 ctx.hasRestoredModeModel = false;
               }
 
+              await this.globalState.update(
+                panelStorageKey(ctx.panelKey, SELECTED_REASONING_STORAGE_KEY),
+                requestedReasoningId
+              );
+              await this.globalState.update(
+                panelStorageKey(ctx.panelKey, SELECTED_REASONING_AGENT_STORAGE_KEY),
+                ctx.acpClient.getAgentId()
+              );
+              await this.globalState.update(
+                LAST_SELECTED_REASONING_STORAGE_KEY,
+                requestedReasoningId
+              );
+              this.postReasoning(panelId, requestedReasoningId);
+
               this.postAgents(panelId);
               this.sendSessionMetadata(panelId);
               this.sendStoredSessions(panelId);
@@ -571,6 +762,14 @@ export class ChatPanelManager {
           );
           this.globalState.update(
             panelStorageKey(context.panelKey, "selectedModel"),
+            undefined
+          );
+          this.globalState.update(
+            panelStorageKey(context.panelKey, SELECTED_REASONING_STORAGE_KEY),
+            undefined
+          );
+          this.globalState.update(
+            panelStorageKey(context.panelKey, SELECTED_REASONING_AGENT_STORAGE_KEY),
             undefined
           );
           this.globalState.update(
@@ -666,7 +865,9 @@ export class ChatPanelManager {
       const currentId = ctx.acpClient.getAgentId();
       if (!getAgent(currentId)) {
         const fallback = getFirstAvailableAgent();
-        ctx.acpClient.setAgent(fallback);
+        ctx.acpClient.setAgent(
+          this.getEffectiveAgentConfig(ctx.panelKey, fallback)
+        );
         this.globalState.update(
           panelStorageKey(ctx.panelKey, "selectedAgent"),
           fallback.id
@@ -675,6 +876,10 @@ export class ChatPanelManager {
           type: "agentChanged",
           agentId: fallback.id,
         });
+        this.postReasoning(
+          panelId,
+          this.getPanelReasoning(ctx.panelKey, fallback.id)
+        );
       }
 
       this.postMessageToPanel(panelId, {
@@ -687,6 +892,10 @@ export class ChatPanelManager {
         })),
         selected: ctx.acpClient.getAgentId(),
       });
+      this.postReasoning(
+        panelId,
+        this.getPanelReasoning(ctx.panelKey, ctx.acpClient.getAgentId())
+      );
     }
   }
 
@@ -1159,7 +1368,8 @@ export class ChatPanelManager {
 
     const agent = getAgent(agentId);
     if (agent) {
-      ctx.acpClient.setAgent(agent);
+      const reasoning = this.getPanelReasoning(ctx.panelKey, agentId);
+      ctx.acpClient.setAgent(this.getEffectiveAgentConfig(ctx.panelKey, agent));
       this.globalState.update(
         panelStorageKey(ctx.panelKey, SELECTED_AGENT_STORAGE_KEY),
         agentId
@@ -1182,6 +1392,7 @@ export class ChatPanelManager {
       ctx.hasSession = false;
       ctx.hasRestoredModeModel = false;
       this.postMessageToPanel(panelId, { type: "agentChanged", agentId });
+      this.postReasoning(panelId, reasoning);
       this.postMessageToPanel(panelId, {
         type: "sessionMetadata",
         modes: null,
@@ -1269,7 +1480,12 @@ export class ChatPanelManager {
     if (!ctx) return;
 
     try {
-      await ctx.acpClient.setModel(modelId);
+      const effectiveModelId = this.getEffectiveModelForSession(
+        ctx.panelKey,
+        ctx.acpClient.getAgentConfig(),
+        modelId
+      );
+      await ctx.acpClient.setModel(effectiveModelId);
       await this.globalState.update(
         panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY),
         modelId
@@ -1282,6 +1498,92 @@ export class ChatPanelManager {
       this.sendSessionMetadata(panelId);
     } catch (error) {
       console.error(`[Chat:${panelId}] Failed to set model:`, error);
+    }
+  }
+
+  private async handleReasoningChange(
+    panelId: string,
+    reasoningId?: string
+  ): Promise<void> {
+    const ctx = this.contexts.get(panelId);
+    if (!ctx) return;
+
+    const normalized = normalizeReasoningLevel(reasoningId);
+    const agentId = ctx.acpClient.getAgentId();
+    const baseAgent = getAgent(agentId) ?? ctx.acpClient.getAgentConfig();
+    const savedModelId = this.globalState.get<string>(
+      panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY)
+    );
+    const savedModelAgentId = this.globalState.get<string>(
+      panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY)
+    );
+    const preferredModel =
+      savedModelId && savedModelAgentId === agentId ? savedModelId : null;
+
+    await this.globalState.update(
+      panelStorageKey(ctx.panelKey, SELECTED_REASONING_STORAGE_KEY),
+      normalized
+    );
+    await this.globalState.update(
+      panelStorageKey(ctx.panelKey, SELECTED_REASONING_AGENT_STORAGE_KEY),
+      agentId
+    );
+    await this.globalState.update(LAST_SELECTED_REASONING_STORAGE_KEY, normalized);
+    this.postReasoning(panelId, normalized);
+
+    // Codex consumes reasoning from startup config (`-c model_reasoning_effort=...`),
+    // so we need to reconfigure and reconnect to apply changes.
+    if (isCodexAgent(baseAgent)) {
+      const effective = this.getEffectiveAgentConfig(
+        ctx.panelKey,
+        baseAgent,
+        preferredModel
+      );
+      ctx.acpClient.setAgent(effective);
+      ctx.hasSession = false;
+      ctx.hasRestoredModeModel = false;
+      this.postMessageToPanel(panelId, {
+        type: "sessionMetadata",
+        modes: null,
+        models: null,
+      });
+      await this.handleConnect(panelId);
+      return;
+    }
+
+    // For disconnected agents, update launch config so next connect picks it up.
+    if (!ctx.acpClient.isConnected()) {
+      const effective = this.getEffectiveAgentConfig(
+        ctx.panelKey,
+        baseAgent,
+        preferredModel
+      );
+      ctx.acpClient.setAgent(effective);
+      return;
+    }
+
+    // Fast Agent can accept reasoning by setting model with `?reasoning=...`.
+    if (isFastAgent(baseAgent) && ctx.hasSession) {
+      const modelForSession =
+        preferredModel ||
+        ctx.acpClient.getSessionMetadata()?.models?.currentModelId ||
+        "";
+      if (modelForSession) {
+        const effectiveModel = this.getEffectiveModelForSession(
+          ctx.panelKey,
+          baseAgent,
+          modelForSession
+        );
+        try {
+          await ctx.acpClient.setModel(effectiveModel);
+        } catch (error) {
+          console.error(
+            `[Chat:${panelId}] Failed to apply reasoning to model:`,
+            error
+          );
+        }
+      }
+      this.sendSessionMetadata(panelId);
     }
   }
 
@@ -1303,7 +1605,24 @@ export class ChatPanelManager {
 
     try {
       if (!ctx.acpClient.isConnected()) {
-        const a = getAgent(ctx.acpClient.getAgentId());
+        const agentId = ctx.acpClient.getAgentId();
+        const savedModelId = this.globalState.get<string>(
+          panelStorageKey(ctx.panelKey, SELECTED_MODEL_STORAGE_KEY)
+        );
+        const savedModelAgentId = this.globalState.get<string>(
+          panelStorageKey(ctx.panelKey, SELECTED_MODEL_AGENT_STORAGE_KEY)
+        );
+        const preferredModel =
+          savedModelId && savedModelAgentId === agentId ? savedModelId : null;
+        const base = getAgent(agentId) ?? ctx.acpClient.getAgentConfig();
+        const effective = this.getEffectiveAgentConfig(
+          ctx.panelKey,
+          base,
+          preferredModel
+        );
+        ctx.acpClient.setAgent(effective);
+
+        const a = ctx.acpClient.getAgentConfig();
         if (a) {
           this.output.appendLine(
             `[connect] agent=${a.id} command=${a.command} args=${JSON.stringify(
@@ -1441,11 +1760,13 @@ export class ChatPanelManager {
     if (!ctx) return;
 
     const metadata = ctx.acpClient.getSessionMetadata();
+    const reasoningId = this.getPanelReasoning(ctx.panelKey, ctx.acpClient.getAgentId());
     this.postMessageToPanel(panelId, {
       type: "sessionMetadata",
       modes: metadata?.modes ?? null,
       models: metadata?.models ?? null,
       commands: metadata?.commands ?? null,
+      reasoningId,
     });
 
     if (!ctx.hasRestoredModeModel && ctx.hasSession) {
@@ -1502,7 +1823,12 @@ export class ChatPanelManager {
         (model: any) => model && model.modelId === savedModelId
       )
     ) {
-      await ctx.acpClient.setModel(savedModelId);
+      const effectiveModelId = this.getEffectiveModelForSession(
+        ctx.panelKey,
+        ctx.acpClient.getAgentConfig(),
+        savedModelId
+      );
+      await ctx.acpClient.setModel(effectiveModelId);
       console.log(`[Chat:${panelId}] Restored model: ${savedModelId}`);
       modelRestored = true;
     }

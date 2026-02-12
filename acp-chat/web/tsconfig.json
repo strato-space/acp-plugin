@@ -20,5 +20,6 @@
       "@/*": ["../../packages/acp-ui/src/*"]
     }
   },
-  "include": ["src", "../../packages/acp-ui/src"]
+  "include": ["src", "../../packages/acp-ui/src"],
+  "exclude": ["../../packages/acp-ui/src/**/*.test.ts"]
 }

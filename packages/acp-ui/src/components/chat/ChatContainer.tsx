@@ -6,8 +6,14 @@ import { StreamingMessage } from "./StreamingMessage";
 import { PlanDisplay } from "./PlanDisplay";
 
 export function ChatContainer() {
-  const { messages, streaming, isThinking, plan, connectAlert, connectionState } =
-    useChatStore();
+  const {
+    messages,
+    streaming,
+    isThinking,
+    plan,
+    connectAlert,
+    connectionState,
+  } = useChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -42,7 +48,7 @@ export function ChatContainer() {
 
   return (
     <ScrollArea
-      className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4 pt-2"
+      className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-2 sm:px-4 pt-2"
       scrollRef={scrollRef}
       onKeyDown={handleKeyDown}
     >
@@ -72,7 +78,11 @@ export function ChatContainer() {
             }
           }
           return (
-            <MessageBubble key={message.id} message={message} inputText={inputText} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              inputText={inputText}
+            />
           );
         })}
 

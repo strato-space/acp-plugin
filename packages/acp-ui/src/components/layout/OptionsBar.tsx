@@ -1,15 +1,32 @@
 import { useChatStore } from "@/store";
-import { useVsCodeApi } from "@/hooks/useVsCodeApi";
+import {
+  REASONING_OPTIONS,
+  shouldShowReasoningControl,
+  useVsCodeApi,
+} from "@/hooks/useVsCodeApi";
 import { Select } from "@/components/ui/select";
 
 export function OptionsBar() {
-  const { modes, currentModeId, models, currentModelId, agents } = useChatStore();
-  const { selectMode, selectModel } = useVsCodeApi();
+  const {
+    modes,
+    currentModeId,
+    models,
+    currentModelId,
+    agents,
+    selectedAgentId,
+    currentReasoningId,
+  } = useChatStore();
+  const { selectMode, selectModel, selectReasoning } = useVsCodeApi();
 
   const hasModes = modes.length > 0;
   const hasModels = models.length > 0;
+  const hasReasoning = shouldShowReasoningControl(
+    selectedAgentId,
+    agents,
+    currentModelId
+  );
 
-  if (!hasModes && !hasModels) {
+  if (!hasModes && !hasModels && !hasReasoning) {
     return null;
   }
 
@@ -45,6 +62,20 @@ export function OptionsBar() {
           {models.map((model) => (
             <option key={model.modelId} value={model.modelId}>
               Model: {model.name || model.modelId}
+            </option>
+          ))}
+        </Select>
+      )}
+
+      {hasReasoning && (
+        <Select
+          value={currentReasoningId || "system"}
+          onChange={(e) => selectReasoning(e.target.value)}
+          label="Select Reasoning"
+        >
+          {REASONING_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              Reasoning: {option.name}
             </option>
           ))}
         </Select>

@@ -85,6 +85,9 @@ export interface WebviewState {
   selectedAgentId?: string | null;
   currentModeId?: string | null;
   currentModelId?: string | null;
+  currentReasoningId?: string | null;
+  runFrameOpenByDefault?: boolean;
+  toolListShowAllByDefault?: boolean;
 }
 
 // Session storage type (matches extension)
@@ -109,6 +112,8 @@ export interface ExtensionMessage {
   agentId?: string;
   modeId?: string;
   modelId?: string;
+  reasoningId?: string;
+  version?: string | null;
   modes?: {
     availableModes: Mode[];
     currentModeId: string;
@@ -124,7 +129,11 @@ export interface ExtensionMessage {
   title?: string;
   kind?: ToolKind;
   // ACP SDK ContentBlock shape (server) or legacy wrapper (VS Code bridge).
-  content?: Array<{ content?: { text?: string }; type?: string; text?: string }>;
+  content?: Array<{
+    content?: { text?: string };
+    type?: string;
+    text?: string;
+  }>;
   rawInput?: unknown;
   rawOutput?: unknown;
   meta?: unknown;

@@ -30,7 +30,13 @@ type Attachment = {
 };
 
 type IncomingMessage =
-  | { type: "ready"; agentId?: string; modeId?: string; modelId?: string }
+  | {
+      type: "ready";
+      agentId?: string;
+      modeId?: string;
+      modelId?: string;
+      reasoningId?: string;
+    }
   | { type: "connect" }
   | { type: "cancel" }
   | { type: "newChat" }
@@ -38,7 +44,80 @@ type IncomingMessage =
   | { type: "selectAgent"; agentId: string }
   | { type: "selectMode"; modeId: string }
   | { type: "selectModel"; modelId: string }
+  | { type: "selectReasoning"; reasoningId?: string }
   | { type: "sendMessage"; text?: string; attachments?: Attachment[] };
+
+type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
+
+function normalizeReasoningLevel(value: string | undefined | null): ReasoningLevel {
+  const v = (value || "").trim().toLowerCase();
+  if (v === "minimal" || v === "low" || v === "medium" || v === "high") return v;
+  return "system";
+}
+
+function isCodexAgent(agent: { id: string; name: string }): boolean {
+  const id = agent.id.toLowerCase();
+  if (id === "codex") return true;
+  return agent.name.toLowerCase().includes("codex");
+}
+
+function isFastAgent(agent: { id: string; name: string }): boolean {
+  const id = agent.id.toLowerCase();
+  if (id === "fast-agent-acp") return true;
+  return agent.name.toLowerCase().includes("fast agent");
+}
+
+function withModelReasoning(modelId: string, reasoning: ReasoningLevel): string {
+  const raw = (modelId || "").trim();
+  if (!raw) return raw;
+  const q = raw.indexOf("?");
+  const base = q === -1 ? raw : raw.slice(0, q);
+  const query = q === -1 ? "" : raw.slice(q + 1);
+  const params = new URLSearchParams(query);
+  if (reasoning === "system") {
+    params.delete("reasoning");
+  } else {
+    params.set("reasoning", reasoning);
+  }
+  const rest = params.toString();
+  return rest ? `${base}?${rest}` : base;
+}
+
+function upsertArg(args: string[], key: string, value: string): string[] {
+  const out = [...args];
+  const eqPrefix = `${key}=`;
+  for (let i = 0; i < out.length; i++) {
+    const a = out[i];
+    if (a === key) {
+      if (i + 1 < out.length) out[i + 1] = value;
+      else out.push(value);
+      return out;
+    }
+    if (a.startsWith(eqPrefix)) {
+      out[i] = `${key}=${value}`;
+      return out;
+    }
+  }
+  out.push(key, value);
+  return out;
+}
+
+function removeCodexReasoningOverride(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "-c" || a === "--config") {
+      const next = args[i + 1];
+      if (typeof next === "string" && next.startsWith("model_reasoning_effort=")) {
+        i += 1;
+        continue;
+      }
+    }
+    if (a.startsWith("model_reasoning_effort=")) continue;
+    out.push(a);
+  }
+  return out;
+}
 
 function send(ws: WebSocket, msg: Record<string, unknown>) {
   ws.send(JSON.stringify(msg));
@@ -135,7 +214,55 @@ type WsContext = {
   streamingText: string;
   stderrBuffer: string;
   agentId: string;
+  reasoningId: ReasoningLevel;
 };
+
+function sendReasoning(ctx: WsContext) {
+  send(ctx.ws, { type: "reasoningUpdate", reasoningId: ctx.reasoningId });
+}
+
+function getEffectiveModelForSession(ctx: WsContext, modelId: string): string {
+  const agent = ctx.client.getAgentConfig();
+  if (!isFastAgent(agent)) return modelId;
+  return withModelReasoning(modelId, ctx.reasoningId);
+}
+
+function getEffectiveAgentConfig(
+  ctx: WsContext,
+  baseAgent: AgentConfig,
+  preferredModelId?: string | null
+): AgentConfig {
+  let args = [...baseAgent.args];
+
+  if (isCodexAgent(baseAgent)) {
+    args = removeCodexReasoningOverride(args);
+    if (ctx.reasoningId !== "system") {
+      args.push("-c", `model_reasoning_effort=${ctx.reasoningId}`);
+    }
+  } else if (isFastAgent(baseAgent)) {
+    let modelArgValue = (preferredModelId || "").trim();
+    if (!modelArgValue) {
+      const idx = args.findIndex((a) => a === "--model" || a === "--models");
+      if (idx !== -1 && typeof args[idx + 1] === "string") {
+        modelArgValue = args[idx + 1];
+      }
+    }
+    if (modelArgValue) {
+      const effectiveModel = withModelReasoning(modelArgValue, ctx.reasoningId);
+      if (args.some((a) => a === "--model" || a === "--models")) {
+        if (args.includes("--model")) {
+          args = upsertArg(args, "--model", effectiveModel);
+        } else {
+          args = upsertArg(args, "--models", effectiveModel);
+        }
+      } else {
+        args.push("--model", effectiveModel);
+      }
+    }
+  }
+
+  return { ...baseAgent, args };
+}
 
 const APP_VERSION = (() => {
   const env = (process.env.ACP_APP_VERSION || process.env.ACP_CHAT_VERSION || "").trim();
@@ -280,6 +407,7 @@ function translateSessionUpdate(ctx: WsContext, n: SessionNotification) {
 async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
   switch (msg.type) {
     case "ready": {
+      ctx.reasoningId = normalizeReasoningLevel(msg.reasoningId);
       // Initialize UI with server-side state and immediately connect.
       send(ctx.ws, {
         type: "connectionState",
@@ -291,7 +419,13 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
       if (agents.length === 0) {
         // Nothing to connect to. Keep the UI responsive and explicit.
         send(ctx.ws, { type: "agents", agents: [], selected: null });
-        send(ctx.ws, { type: "sessionMetadata", modes: null, models: null, commands: null });
+        send(ctx.ws, {
+          type: "sessionMetadata",
+          modes: null,
+          models: null,
+          commands: null,
+          reasoningId: ctx.reasoningId,
+        });
         // Treat this as an error so the UI shows the alert (it only renders alerts in error state).
         send(ctx.ws, { type: "connectionState", state: "error" });
         send(ctx.ws, {
@@ -313,7 +447,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         const requested = getAgent(requestedAgentId);
         if (requested) {
           ctx.agentId = requestedAgentId;
-          ctx.client.setAgent(requested);
+          ctx.client.setAgent(getEffectiveAgentConfig(ctx, requested, msg.modelId ?? null));
           ctx.hasSession = false;
           selected = requestedAgentId;
           selectedAvailable =
@@ -326,7 +460,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         const fallback = agents.find((a) => a.available) ?? agents[0] ?? null;
         if (fallback) {
           ctx.agentId = fallback.id;
-          ctx.client.setAgent(fallback);
+          ctx.client.setAgent(getEffectiveAgentConfig(ctx, fallback, msg.modelId ?? null));
           ctx.hasSession = false;
           selected = fallback.id;
           selectedAvailable = fallback.available;
@@ -343,7 +477,14 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         })),
         selected,
       });
-      send(ctx.ws, { type: "sessionMetadata", modes: null, models: null, commands: null });
+      sendReasoning(ctx);
+      send(ctx.ws, {
+        type: "sessionMetadata",
+        modes: null,
+        models: null,
+        commands: null,
+        reasoningId: ctx.reasoningId,
+      });
       // `acp-chat` does not persist sessions server-side; keep the client-side (local) sessions intact.
 
       // Auto-connect on load when we have a valid *available* selected agent.
@@ -358,7 +499,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
             await ctx.client.setMode(msg.modeId.trim());
           }
           if (typeof msg.modelId === "string" && msg.modelId.trim()) {
-            await ctx.client.setModel(msg.modelId.trim());
+            await ctx.client.setModel(getEffectiveModelForSession(ctx, msg.modelId.trim()));
           }
 
           const meta = ctx.client.getSessionMetadata();
@@ -367,6 +508,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
             modes: meta?.modes ?? null,
             models: meta?.models ?? null,
             commands: meta?.commands ?? null,
+            reasoningId: ctx.reasoningId,
           });
         } catch (e) {
           send(ctx.ws, { type: "connectionState", state: "error" });
@@ -400,10 +542,17 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         return;
       }
       ctx.agentId = nextAgentId;
-      ctx.client.setAgent(a);
+      ctx.client.setAgent(getEffectiveAgentConfig(ctx, a));
       ctx.hasSession = false;
       send(ctx.ws, { type: "agentChanged", agentId: nextAgentId });
-      send(ctx.ws, { type: "sessionMetadata", modes: null, models: null, commands: null });
+      sendReasoning(ctx);
+      send(ctx.ws, {
+        type: "sessionMetadata",
+        modes: null,
+        models: null,
+        commands: null,
+        reasoningId: ctx.reasoningId,
+      });
 
       // Auto-connect on agent switch (no Connect button in the UI).
       try {
@@ -412,7 +561,7 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
         send(ctx.ws, { type: "connectionState", state: "connected" });
         await ensureSession(ctx);
         const meta = ctx.client.getSessionMetadata();
-        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null });
+        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null, reasoningId: ctx.reasoningId });
       } catch (e) {
         send(ctx.ws, { type: "connectionState", state: "error" });
         send(ctx.ws, { type: "connectAlert", text: e instanceof Error ? e.message : String(e) });
@@ -422,12 +571,17 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
 
     case "connect": {
       try {
+        if (!ctx.client.isConnected()) {
+          const currentId = ctx.client.getAgentId();
+          const base = getAgent(currentId) ?? ctx.client.getAgentConfig();
+          ctx.client.setAgent(getEffectiveAgentConfig(ctx, base));
+        }
         send(ctx.ws, { type: "connectionState", state: "connecting" });
         await ensureConnected(ctx);
         send(ctx.ws, { type: "connectionState", state: "connected" });
         await ensureSession(ctx);
         const meta = ctx.client.getSessionMetadata();
-        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null });
+        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null, reasoningId: ctx.reasoningId });
       } catch (e) {
         send(ctx.ws, { type: "connectionState", state: "error" });
         send(ctx.ws, { type: "connectAlert", text: e instanceof Error ? e.message : String(e) });
@@ -439,7 +593,13 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
       try {
         await ctx.client.setMode(msg.modeId);
         const meta = ctx.client.getSessionMetadata();
-        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null });
+        send(ctx.ws, {
+          type: "sessionMetadata",
+          modes: meta?.modes ?? null,
+          models: meta?.models ?? null,
+          commands: meta?.commands ?? null,
+          reasoningId: ctx.reasoningId,
+        });
       } catch (e) {
         send(ctx.ws, { type: "error", text: e instanceof Error ? e.message : String(e) });
       }
@@ -448,11 +608,80 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
 
     case "selectModel": {
       try {
-        await ctx.client.setModel(msg.modelId);
+        await ctx.client.setModel(getEffectiveModelForSession(ctx, msg.modelId));
         const meta = ctx.client.getSessionMetadata();
-        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null });
+        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null, reasoningId: ctx.reasoningId });
       } catch (e) {
         send(ctx.ws, { type: "error", text: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+
+    case "selectReasoning": {
+      ctx.reasoningId = normalizeReasoningLevel(msg.reasoningId);
+      sendReasoning(ctx);
+
+      const currentId = ctx.client.getAgentId();
+      const base = getAgent(currentId) ?? ctx.client.getAgentConfig();
+
+      if (isCodexAgent(base)) {
+        ctx.client.setAgent(getEffectiveAgentConfig(ctx, base));
+        ctx.hasSession = false;
+        send(ctx.ws, {
+          type: "sessionMetadata",
+          modes: null,
+          models: null,
+          commands: null,
+          reasoningId: ctx.reasoningId,
+        });
+        try {
+          send(ctx.ws, { type: "connectionState", state: "connecting" });
+          await ensureConnected(ctx);
+          send(ctx.ws, { type: "connectionState", state: "connected" });
+          await ensureSession(ctx);
+          const meta = ctx.client.getSessionMetadata();
+          send(ctx.ws, {
+            type: "sessionMetadata",
+            modes: meta?.modes ?? null,
+            models: meta?.models ?? null,
+            commands: meta?.commands ?? null,
+            reasoningId: ctx.reasoningId,
+          });
+        } catch (e) {
+          send(ctx.ws, { type: "connectionState", state: "error" });
+          send(ctx.ws, {
+            type: "connectAlert",
+            text: e instanceof Error ? e.message : String(e),
+          });
+        }
+        return;
+      }
+
+      if (!ctx.client.isConnected()) {
+        ctx.client.setAgent(getEffectiveAgentConfig(ctx, base));
+        return;
+      }
+
+      if (isFastAgent(base) && ctx.hasSession) {
+        const currentModel = ctx.client.getSessionMetadata()?.models?.currentModelId;
+        if (currentModel) {
+          try {
+            await ctx.client.setModel(getEffectiveModelForSession(ctx, currentModel));
+          } catch (e) {
+            send(ctx.ws, {
+              type: "error",
+              text: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+        const meta = ctx.client.getSessionMetadata();
+        send(ctx.ws, {
+          type: "sessionMetadata",
+          modes: meta?.modes ?? null,
+          models: meta?.models ?? null,
+          commands: meta?.commands ?? null,
+          reasoningId: ctx.reasoningId,
+        });
       }
       return;
     }
@@ -465,12 +694,24 @@ async function handleIncoming(ctx: WsContext, msg: IncomingMessage) {
     case "newChat": {
       ctx.hasSession = false;
       send(ctx.ws, { type: "chatCleared" });
-      send(ctx.ws, { type: "sessionMetadata", modes: null, models: null, commands: null });
+      send(ctx.ws, {
+        type: "sessionMetadata",
+        modes: null,
+        models: null,
+        commands: null,
+        reasoningId: ctx.reasoningId,
+      });
       try {
         await ensureConnected(ctx);
         await ensureSession(ctx);
         const meta = ctx.client.getSessionMetadata();
-        send(ctx.ws, { type: "sessionMetadata", modes: meta?.modes ?? null, models: meta?.models ?? null, commands: meta?.commands ?? null });
+        send(ctx.ws, {
+          type: "sessionMetadata",
+          modes: meta?.modes ?? null,
+          models: meta?.models ?? null,
+          commands: meta?.commands ?? null,
+          reasoningId: ctx.reasoningId,
+        });
       } catch {
         // ignore
       }
@@ -607,7 +848,6 @@ wss.on("connection", (ws, req) => {
   const connectTimeoutMs = Number.parseInt(process.env.ACP_CONNECT_TIMEOUT_MS || "600000", 10);
   const client = new ACPClient({ connectTimeoutMs });
   const first = getFirstAvailableAgent();
-  client.setAgent(first);
 
   const ctx: WsContext = {
     ws,
@@ -616,7 +856,10 @@ wss.on("connection", (ws, req) => {
     streamingText: "",
     stderrBuffer: "",
     agentId: first.id,
+    reasoningId: "system",
   };
+
+  client.setAgent(getEffectiveAgentConfig(ctx, first));
 
   const unsubState = client.setOnStateChange((state) => {
     send(ws, { type: "connectionState", state });
