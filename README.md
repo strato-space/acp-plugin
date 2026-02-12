@@ -1,17 +1,17 @@
-# ACP Plugin (VS Code Extension + Web UI)
+# ACP — Agent Client Protocol (VS Code Extension + Web UI)
 
-ACP Plugin is a pragmatic client for the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/get-started/introduction). It lets you run ACP-compatible coding agents from:
+ACP (VS Code extension + optional web UI) is a pragmatic client for the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/get-started/introduction). It lets you run ACP-compatible coding agents from:
 
 - VS Code (extension)
 - Your browser (acp-chat, optional)
 
-ACP is the protocol. ACP Plugin is the client (VS Code extension + optional web UI) in this repository.
+ACP is the protocol. This repository ships a client (VS Code extension + optional web UI).
 
 ![ACP Screenshot](assets/acp-sidebar.png)
 
 ## Agent Configuration
 
-ACP Plugin intentionally follows the `agent_servers` format used by the _[Zed editor](https://zed.dev)_, so you can copy/paste agent definitions between Zed and ACP Plugin with minimal changes.
+This extension intentionally follows the `agent_servers` format used by the _[Zed editor](https://zed.dev)_, so you can copy/paste agent definitions between Zed and this extension with minimal changes.
 
 Note: `agent_servers` is a settings convention for describing how to spawn agent processes. It is not part of the ACP wire protocol.
 
@@ -26,14 +26,14 @@ Built-in default agent presets are defined in repo file `src/acp/agents.ts`, bun
 Parameter `acp.includeBuiltInAgents` (default `true`) defines whether these built-in presets are included alongside custom agents. For scalar settings, workspace values override global values.
 If custom agents do not appear, check that your settings use `agent_servers` (or `acp.agents`). The legacy key `acp.agentServers` is deprecated and ignored by current builds.
 Codex CLI uses system-level Codex settings from `~/.codex/config.toml` (unless you override them explicitly with CLI `-c key=value` arguments in your own agent command).
-Reasoning control in ACP Plugin Settings uses these mappings:
+Reasoning control in ACP Settings uses these mappings:
 
 - Codex CLI: startup override `-c model_reasoning_effort=<value>` (`system` keeps `~/.codex/config.toml` defaults).
 - Fast Agent ACP: model override `<model>?reasoning=<value>` for reasoning-capable models.
 
 ### Pre-configured Agents
 
-ACP Plugin ships with a set of built-in agent presets (you can override any of them by defining an agent with the same id in settings):
+ACP ships with a set of built-in agent presets (you can override any of them by defining an agent with the same id in settings):
 
 | ID               | Name           | Default command                                                     |
 | ---------------- | -------------- | ------------------------------------------------------------------- |
@@ -52,14 +52,14 @@ Notes:
 - These are just defaults, not endorsements. Some agents require separate auth/login steps.
 - `npx` requires Node.js to be installed and accessible on `PATH` (especially important for Remote-SSH hosts).
 - For Fast Agent ACP, the built-in command default model is `codex`.
-- Fast Agent model choices are resolved as a union: ACP session metadata (if provided by the agent) plus a built-in coding baseline list in ACP Plugin.
-- If no current model is set in-session, ACP Plugin defaults the fallback picker to `codexplan`.
+- Fast Agent model choices are resolved as a union: ACP session metadata (if provided by the agent) plus a built-in coding baseline list in ACP.
+- If no current model is set in-session, ACP defaults the fallback picker to `codexplan`.
 - The baseline list intentionally includes `claude-opus-4-6` as a required option, even when not returned by agent metadata.
 - Reasoning dropdown is shown for Codex CLI and for Fast Agent when the current model is reasoning-capable (`system`, `minimal`, `low`, `medium`, `high`).
 
 ### Quick Start (VS Code)
 
-1. Install ACP Plugin (Marketplace or VSIX).
+1. Install ACP (Marketplace or VSIX).
 2. Open the ACP view in the Activity Bar (ACP icon), then click "Open Chat".
 3. Pick an agent from Settings (gear icon), click Connect, and start chatting.
 
@@ -103,7 +103,7 @@ Supported fields:
 
 ### Extension Settings
 
-ACP Plugin keeps compatibility with upstream `formulahendry/vscode-acp` settings, while also supporting the `agent_servers` format used by the _[Zed editor](https://zed.dev)_.
+ACP keeps compatibility with upstream `formulahendry/vscode-acp` settings, while also supporting the `agent_servers` format used by the _[Zed editor](https://zed.dev)_.
 
 | Setting                       | Default  | Implemented Here | Description                                                                                                                      |
 | ----------------------------- | -------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -124,7 +124,7 @@ These placeholders are expanded in `command`, `args`, and `cwd`:
 
 ### One Small Ergonomic Hack: `--watch`
 
-If a custom agent's `args` include ACP transport (`--transport acp` or `--transport=acp`), ACP Plugin automatically appends `--watch` (if missing).
+If a custom agent's `args` include ACP transport (`--transport acp` or `--transport=acp`), ACP automatically appends `--watch` (if missing).
 
 Why:
 
@@ -133,7 +133,7 @@ Why:
 
 ### Where Agent Config Is Read From
 
-ACP Plugin merges agent definitions found in the following places (lowest priority first):
+ACP merges agent definitions found in the following places (lowest priority first):
 
 - `acp.agents` (supported alias for upstream `formulahendry/vscode-acp`)
 - `agent_servers` (Zed-style, root)
@@ -184,7 +184,7 @@ This is a monorepo:
 
 ### Install From Marketplace
 
-- Install from the VS Code Extensions view (search for **ACP Plugin**), or:
+- Install from the VS Code Extensions view (search for **ACP — Agent Client Protocol**), or:
 
 ```bash
 code --install-extension strato-space.acp-plugin
