@@ -173,6 +173,8 @@ interface PanelContext {
   streamingText: string;
   hasRestoredModeModel: boolean;
   stderrBuffer: string;
+  isDisposing?: boolean;
+  detachClientListeners?: () => void;
 }
 
 export class ChatPanelManager {
@@ -203,6 +205,20 @@ export class ChatPanelManager {
     this.onGlobalStateChange = onGlobalStateChange;
     this.output = vscode.window.createOutputChannel("ACP");
     this.trafficOutput = vscode.window.createOutputChannel("ACP Traffic");
+  }
+
+  private detachClientListeners(ctx: PanelContext): void {
+    try {
+      ctx.detachClientListeners?.();
+    } catch (error) {
+      this.output.appendLine(
+        `[lifecycle] failed to detach listeners: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      ctx.detachClientListeners = undefined;
+    }
   }
 
   public refreshRuntimeSettings(): void {
@@ -535,6 +551,8 @@ export class ChatPanelManager {
       streamingText: "",
       hasRestoredModeModel: false,
       stderrBuffer: "",
+      isDisposing: false,
+      detachClientListeners: undefined,
     };
 
     this.contexts.set(panelId, ctx);
@@ -545,14 +563,13 @@ export class ChatPanelManager {
     this.postAgents(panelId);
 
     // 패널별 이벤트 리스너 설정
-    acpClient.setOnStateChange((state) => {
+    const unsubState = acpClient.setOnStateChange((state) => {
+      const current = this.contexts.get(panelId);
+      if (!current || current.isDisposing) return;
       this.postMessageToPanel(panelId, { type: "connectionState", state });
       // 연결이 끊어지면 세션도 리셋
       if (state === "disconnected" || state === "error") {
-        const context = this.contexts.get(panelId);
-        if (context) {
-          context.hasSession = false;
-        }
+        current.hasSession = false;
       }
       // 상태 표시줄 업데이트를 위한 글로벌 콜백
       if (this.activePanelId === panelId && this.onGlobalStateChange) {
@@ -560,16 +577,29 @@ export class ChatPanelManager {
       }
     });
 
-    acpClient.setOnSessionUpdate((update) => {
+    const unsubSessionUpdate = acpClient.setOnSessionUpdate((update) => {
+      const current = this.contexts.get(panelId);
+      if (!current || current.isDisposing) return;
       this.handleSessionUpdate(panelId, update);
     });
 
-    acpClient.setOnPermissionRequest((params) => this.requestPermission(params));
+    const unsubPermissionRequest = acpClient.setOnPermissionRequest((params) =>
+      this.requestPermission(params)
+    );
 
-    acpClient.setOnStderr((text) => {
+    const unsubStderr = acpClient.setOnStderr((text) => {
+      const current = this.contexts.get(panelId);
+      if (!current || current.isDisposing) return;
       this.handleStderr(panelId, text);
       this.output.appendLine(text.trimEnd());
     });
+
+    ctx.detachClientListeners = () => {
+      unsubState();
+      unsubSessionUpdate();
+      unsubPermissionRequest();
+      unsubStderr();
+    };
 
     panel.webview.onDidReceiveMessage(
       async (message: WebviewMessage) => {
@@ -750,6 +780,9 @@ export class ChatPanelManager {
         // 패널 정리 시 해당 acpClient도 정리
         const context = this.contexts.get(panelId);
         if (context) {
+          context.isDisposing = true;
+          this.detachClientListeners(context);
+          this.contexts.delete(panelId);
           context.acpClient.dispose();
           // Best-effort cleanup for per-panel persisted state.
           this.globalState.update(
@@ -777,7 +810,6 @@ export class ChatPanelManager {
             undefined
           );
         }
-        this.contexts.delete(panelId);
         if (this.activePanelId === panelId) {
           // Set another panel as active if available
           const remainingPanels = Array.from(this.contexts.keys());
@@ -827,6 +859,8 @@ export class ChatPanelManager {
 
   public dispose(): void {
     this.contexts.forEach((ctx, _panelId) => {
+      ctx.isDisposing = true;
+      this.detachClientListeners(ctx);
       ctx.acpClient.dispose();
       ctx.panel.dispose();
     });
@@ -1846,8 +1880,16 @@ export class ChatPanelManager {
     message: Record<string, unknown>
   ): void {
     const ctx = this.contexts.get(panelId);
-    if (ctx) {
-      ctx.panel.webview.postMessage(message);
+    if (!ctx || ctx.isDisposing) return;
+
+    try {
+      void ctx.panel.webview.postMessage(message);
+    } catch (error) {
+      this.output.appendLine(
+        `[ui] failed to post message to panel ${panelId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 

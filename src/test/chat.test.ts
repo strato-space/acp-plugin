@@ -360,4 +360,70 @@ suite("ChatPanelManager", () => {
       assert.deepStrictEqual(msg.meta, { parentToolCallId: "parent-1" });
     });
   });
+
+  suite("Panel message lifecycle safety", () => {
+    test("postMessageToPanel should not throw when webview is already disposed", () => {
+      const provider = new ChatPanelManager(
+        mockExtensionUri,
+        memento as any,
+        undefined
+      );
+
+      (provider as any).contexts.set("panel-1", {
+        panel: {
+          webview: {
+            postMessage: () => {
+              throw new Error("webview disposed");
+            },
+          },
+        },
+        panelKey: "panel-key-1",
+        acpClient: {} as any,
+        hasSession: false,
+        streamingText: "",
+        hasRestoredModeModel: false,
+        stderrBuffer: "",
+      });
+
+      assert.doesNotThrow(() => {
+        (provider as any).postMessageToPanel("panel-1", {
+          type: "connectionState",
+          state: "disconnected",
+        });
+      });
+    });
+
+    test("postMessageToPanel should skip sending while panel is disposing", () => {
+      const provider = new ChatPanelManager(
+        mockExtensionUri,
+        memento as any,
+        undefined
+      );
+
+      let called = false;
+      (provider as any).contexts.set("panel-1", {
+        panel: {
+          webview: {
+            postMessage: () => {
+              called = true;
+            },
+          },
+        },
+        panelKey: "panel-key-1",
+        acpClient: {} as any,
+        hasSession: false,
+        streamingText: "",
+        hasRestoredModeModel: false,
+        stderrBuffer: "",
+        isDisposing: true,
+      });
+
+      (provider as any).postMessageToPanel("panel-1", {
+        type: "connectionState",
+        state: "disconnected",
+      });
+
+      assert.strictEqual(called, false);
+    });
+  });
 });

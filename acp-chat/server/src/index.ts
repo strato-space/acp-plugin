@@ -120,7 +120,14 @@ function removeCodexReasoningOverride(args: string[]): string[] {
 }
 
 function send(ws: WebSocket, msg: Record<string, unknown>) {
-  ws.send(JSON.stringify(msg));
+  // Ignore sends on closed/closing sockets (e.g. late async ACP updates).
+  if (ws.readyState !== 1) return false;
+  try {
+    ws.send(JSON.stringify(msg));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getAuthToken(req: http.IncomingMessage): string | null {
