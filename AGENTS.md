@@ -18,6 +18,8 @@
 - `npm run watch`: watch TypeScript + esbuild (+ webview build) for local development.
 - `npm run compile`: one-off build (typecheck + webview build + bundle).
 - `npm run package`: production build (used by `vsce` packaging).
+- `npm run build:vsix`: build production bundle and create `acp-plugin-<version>.vsix`.
+- `npm run release:patch`: bump patch version and produce a fresh `.vsix` in one command.
 - `npx vsce package --no-dependencies`: create a `.vsix` for manual install/testing.
 - `npm --prefix acp-chat ci && npm --prefix acp-chat run build`: build the standalone web UI + server bridge.
 - `npm run test:webview:unit`: run unit tests for shared UI logic (tool visibility and similar pure logic).
@@ -36,11 +38,10 @@ From the repo root:
 
 ```bash
 npm ci
-npm run package
-
-# Produces a .vsix like: acp-plugin-<version>.vsix
-npx vsce package --no-dependencies
+npm run release:patch
 ```
+
+This command applies a patch version bump and produces a `.vsix` like `acp-plugin-<version>.vsix`.
 
 Notes:
 
