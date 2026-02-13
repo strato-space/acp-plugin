@@ -2,7 +2,7 @@
   "name": "acp-plugin",
   "displayName": "ACP — Agent Client Protocol",
   "description": "ACP client for VS Code. Chat with Agent Client Protocol (ACP) compatible coding agents directly in your editor.",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "license": "Apache-2.0",
   "publisher": "strato-space",
   "icon": "assets/icon.png",
