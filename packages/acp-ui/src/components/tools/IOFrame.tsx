@@ -14,6 +14,7 @@ export type IOFrameProps = {
   icon: ReactNode;
   value: unknown;
   children: ReactNode;
+  previewText?: string;
   defaultOpen?: boolean;
   className?: string;
   previewMaxLen?: number;
@@ -24,12 +25,16 @@ export const IOFrame = memo(function IOFrame({
   icon,
   value,
   children,
+  previewText,
   defaultOpen = false,
   className,
   previewMaxLen = 120,
 }: IOFrameProps) {
   const hierarchyStyle = useChatStore((s) => s.hierarchyStyle);
   const preview = useMemo(() => {
+    if (typeof previewText === "string") {
+      return toSingleLinePreview(previewText, previewMaxLen);
+    }
     if (value === null || value === undefined) return "";
     if (typeof value === "string") {
       return toSingleLinePreview(value, previewMaxLen);
@@ -43,7 +48,7 @@ export const IOFrame = memo(function IOFrame({
         return "";
       }
     }
-  }, [value, previewMaxLen]);
+  }, [value, previewMaxLen, previewText]);
 
   const header = preview ? `${title} · ${preview}` : title;
 

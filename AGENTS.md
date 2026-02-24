@@ -241,22 +241,30 @@ For more details, see README.md and docs/QUICKSTART.md.
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+1. **Bump + package before final push (MANDATORY)** - For any shipped code/docs change intended for release, run:
+   ```bash
+   npm version patch --no-git-tag-version
+   npm run build:vsix
+   ```
+2. **File issues for remaining work** - Create issues for anything that needs follow-up
+3. **Run quality gates** (if code changed) - Tests, linters, builds
+4. **Update issue status** - Close finished work, update in-progress items
+5. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
    bd sync
+   git add -A
+   git commit -m "<type>: <summary>"
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+6. **Clean up** - Clear stashes, prune remote branches
+7. **Verify** - All changes committed AND pushed
+8. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
+- Release-ready handoff requires `version bump + build vsix + git add/commit/push`
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds

@@ -40,6 +40,7 @@ interface StoredMessage {
   id: string;
   type: "user" | "assistant" | "error" | "system";
   text: string;
+  promptText?: string;
   html?: string;
   thinkingText?: string;
   timestamp: number;

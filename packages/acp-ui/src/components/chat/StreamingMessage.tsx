@@ -15,6 +15,7 @@ export function StreamingMessage() {
     }
     return null;
   }, [messages]);
+  const promptText = streaming.inputText || lastUserText;
 
   const showAnything =
     isThinking ||
@@ -48,7 +49,7 @@ export function StreamingMessage() {
         <RunFrame
           title={title}
           state={frameState}
-          inputText={lastUserText}
+          inputText={promptText}
           thinkingText={streaming.thinkingText}
           tools={
             Object.keys(streaming.tools).length > 0 ? streaming.tools : null

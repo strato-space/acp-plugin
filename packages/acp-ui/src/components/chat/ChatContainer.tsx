@@ -67,13 +67,15 @@ export function ChatContainer() {
         )}
 
         {messages.map((message, idx) => {
-          let inputText: string | null = null;
+          let inputText: string | null = message.promptText ?? null;
           if (message.type === "assistant") {
-            for (let j = idx - 1; j >= 0; j--) {
-              const prev = messages[j];
-              if (prev.type === "user") {
-                inputText = prev.text;
-                break;
+            if (!inputText) {
+              for (let j = idx - 1; j >= 0; j--) {
+                const prev = messages[j];
+                if (prev.type === "user") {
+                  inputText = prev.text;
+                  break;
+                }
               }
             }
           }

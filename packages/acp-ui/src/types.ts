@@ -63,6 +63,9 @@ export interface Message {
   id: string;
   type: "user" | "assistant" | "error" | "system";
   text: string;
+  // Prompt text that produced this assistant message.
+  // Stored explicitly so Input blocks survive restore/migration even if user rows are missing.
+  promptText?: string;
   html?: string;
   thinkingText?: string;
   tools?: Record<string, Tool>;

@@ -88,12 +88,21 @@ function applyToolUpdatesToMessages(
   return nextMessages;
 }
 
+function findLastUserMessageText(messages: Message[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.type === "user" && m.text.trim()) return m.text;
+  }
+  return null;
+}
+
 // Re-export for backward compatibility
 export type Session = StoredSession;
 
 interface StreamingState {
   currentText: string;
   thinkingText: string;
+  inputText: string | null;
   tools: Record<string, Tool>;
   expandedToolId: string | null;
   hasActiveTool: boolean;
@@ -144,6 +153,7 @@ interface ChatStore {
 
   // Messages
   messages: Message[];
+  lastUserInputText: string | null;
   addMessage: (message: Omit<Message, "id" | "timestamp">) => void;
   updateLastAssistantMessage: (updates: Partial<Message>) => void;
   /**
@@ -249,6 +259,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       streaming: {
         currentText: "",
         thinkingText: "",
+        inputText: null,
         tools: {},
         expandedToolId: null,
         hasActiveTool: false,
@@ -256,6 +267,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       plan: null,
       attachments: [],
       isThinking: false,
+      lastUserInputText: findLastUserMessageText(newSession.messages),
       connectAlert: null,
     }));
     return id;
@@ -281,6 +293,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         streaming: {
           currentText: "",
           thinkingText: "",
+          inputText: null,
           tools: {},
           expandedToolId: null,
           hasActiveTool: false,
@@ -288,6 +301,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         plan: null,
         attachments: [],
         isThinking: false,
+        lastUserInputText: findLastUserMessageText(session.messages),
         connectAlert: null,
       });
     }
@@ -317,6 +331,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         streaming: {
           currentText: "",
           thinkingText: "",
+          inputText: null,
           tools: {},
           expandedToolId: null,
           hasActiveTool: false,
@@ -324,6 +339,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         plan: null,
         attachments: [],
         isThinking: false,
+        lastUserInputText: null,
       };
     }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -362,17 +378,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   // Messages
   messages: [],
+  lastUserInputText: null,
   addMessage: (message) =>
-    set((state) => ({
-      messages: [
-        ...state.messages,
-        {
-          ...message,
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-        },
-      ],
-    })),
+    set((state) => {
+      const nextMessage: Message = {
+        ...message,
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+      };
+      return {
+        messages: [...state.messages, nextMessage],
+        lastUserInputText:
+          nextMessage.type === "user"
+            ? nextMessage.text
+            : state.lastUserInputText,
+      };
+    }),
   updateLastAssistantMessage: (updates) =>
     set((state) => {
       const messages = [...state.messages];
@@ -406,6 +427,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         streaming: {
           currentText: "",
           thinkingText: "",
+          inputText: null,
           tools: {},
           expandedToolId: null,
           hasActiveTool: false,
@@ -413,6 +435,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         plan: null,
         attachments: [],
         isThinking: false,
+        lastUserInputText: null,
       };
     }),
   clearMessages: () =>
@@ -422,6 +445,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       streaming: {
         currentText: "",
         thinkingText: "",
+        inputText: null,
         tools: {},
         expandedToolId: null,
         hasActiveTool: false,
@@ -429,27 +453,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       plan: null,
       attachments: [],
       isThinking: false,
+      lastUserInputText: null,
     }),
 
   // Streaming
   streaming: {
     currentText: "",
     thinkingText: "",
+    inputText: null,
     tools: {},
     expandedToolId: null,
     hasActiveTool: false,
   },
   startStreaming: () =>
-    set({
+    set((state) => ({
       streaming: {
         currentText: "",
         thinkingText: "",
+        inputText: state.lastUserInputText,
         tools: {},
         expandedToolId: null,
         hasActiveTool: false,
       },
       isThinking: true,
-    }),
+    })),
   appendStreamChunk: (text) =>
     set((state) => {
       const streaming = state.streaming;
@@ -478,6 +505,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           id: crypto.randomUUID(),
           type: "assistant",
           text: finalText,
+          promptText: streaming.inputText || undefined,
           html,
           thinkingText: finalThinking || undefined,
           tools:
@@ -492,6 +520,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           streaming: {
             currentText: "",
             thinkingText: "",
+            inputText: null,
             tools: {},
             expandedToolId: null,
             hasActiveTool: false,
@@ -504,6 +533,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         streaming: {
           currentText: "",
           thinkingText: "",
+          inputText: null,
           tools: {},
           expandedToolId: null,
           hasActiveTool: false,
@@ -615,6 +645,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         streaming: {
           currentText: "",
           thinkingText: "",
+          inputText: null,
           tools: {},
           expandedToolId: null,
           hasActiveTool: false,

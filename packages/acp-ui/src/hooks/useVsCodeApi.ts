@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { useChatStore } from "../store";
 import { detectToolKindFromName } from "@/lib/ansi";
+import { buildToolDisplayName, normalizeBaseToolName } from "@/lib/toolTitle";
 import type { Model } from "../types";
 
 export type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
@@ -48,6 +49,15 @@ function safeJsonStringify(value: unknown): string | null {
     } catch {
       return null;
     }
+  }
+}
+
+function safeJsonParse(value: string | null | undefined): unknown {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
   }
 }
 
@@ -573,8 +583,14 @@ export function useVsCodeInit() {
 
         case "toolCallStart":
           if (msg.toolCallId && msg.name) {
-            const detectedKind = detectToolKindFromName(
+            const displayHintInput = { rawInput: msg.rawInput, meta: msg.meta };
+            const displayName = buildToolDisplayName(
               msg.name,
+              displayHintInput,
+              msg.kind as any
+            );
+            const detectedKind = detectToolKindFromName(
+              displayName,
               msg.kind as any
             );
             const isTaskTool =
@@ -590,7 +606,7 @@ export function useVsCodeInit() {
                 : null;
 
             const tool: Tool = {
-              name: msg.name,
+              name: displayName,
               input: safeJsonStringify(msg.rawInput),
               output: extractToolOutput(msg),
               status: "running",
@@ -649,12 +665,6 @@ export function useVsCodeInit() {
 
         case "toolCallComplete":
           if (msg.toolCallId) {
-            const normalizeBaseName = (name: string): string => {
-              // Strip trailing "(...)" arguments and whitespace.
-              const idx = name.indexOf("(");
-              return (idx >= 0 ? name.slice(0, idx) : name).trim();
-            };
-
             const findMatchingRunningToolId = (
               baseName: string,
               kind?: string
@@ -665,7 +675,7 @@ export function useVsCodeInit() {
               for (const [id, tool] of Object.entries(state.streaming.tools)) {
                 if (tool.status !== "running") continue;
                 if (kind && tool.kind && tool.kind !== kind) continue;
-                if (normalizeBaseName(tool.name) === baseName) return id;
+                if (normalizeBaseToolName(tool.name) === baseName) return id;
               }
 
               // 2) Fall back to recent assistant messages that already finalized tools
@@ -675,7 +685,7 @@ export function useVsCodeInit() {
                 for (const [id, tool] of Object.entries(m.tools)) {
                   if (tool.status !== "running") continue;
                   if (kind && tool.kind && tool.kind !== kind) continue;
-                  if (normalizeBaseName(tool.name) === baseName) return id;
+                  if (normalizeBaseToolName(tool.name) === baseName) return id;
                 }
               }
 
@@ -697,7 +707,7 @@ export function useVsCodeInit() {
 
               if (!hasExact) {
                 const title = msg.title || "Tool";
-                const baseName = normalizeBaseName(title);
+                const baseName = normalizeBaseToolName(title);
                 const matchId = findMatchingRunningToolId(baseName, msg.kind);
                 if (matchId && matchId !== msg.toolCallId) {
                   toolAliasRef.current.set(msg.toolCallId, matchId);
@@ -730,10 +740,24 @@ export function useVsCodeInit() {
             const bufferedTool = toolUpdatesRef.current.get(logicalToolCallId);
             const storeTool = actions.streaming?.tools?.[logicalToolCallId];
             const existingTool = bufferedTool || storeTool;
+            const existingInput =
+              existingTool?.input && existingTool.input !== input
+                ? safeJsonParse(existingTool.input)
+                : undefined;
+            const displayHintInput = {
+              rawInput: msg.rawInput,
+              meta: msg.meta,
+              previousInput: existingInput,
+            };
+
+            const displayName = buildToolDisplayName(
+              msg.title || msg.name || existingTool?.name || "Unknown",
+              displayHintInput,
+              (msg.kind || existingTool?.kind) as any
+            );
 
             const isTaskTool = (() => {
-              const nameForKind =
-                msg.title || msg.name || existingTool?.name || "";
+              const nameForKind = displayName;
               const kindForDetect = (msg.kind || existingTool?.kind) as any;
               const detected = detectToolKindFromName(
                 nameForKind,
@@ -743,12 +767,12 @@ export function useVsCodeInit() {
             })();
 
             const detectedKind = detectToolKindFromName(
-              msg.title || existingTool?.name || "Unknown",
+              displayName,
               (msg.kind || existingTool?.kind) as any
             );
 
             const updatedTool: Tool = {
-              name: msg.title || existingTool?.name || "Unknown",
+              name: displayName,
               kind: detectedKind,
               input: input ?? existingTool?.input ?? null,
               output: output ?? existingTool?.output ?? null,
@@ -1096,6 +1120,7 @@ export function useVsCodeInit() {
           id: m.id,
           type: m.type,
           text: m.text,
+          promptText: m.promptText,
           html: m.html,
           thinkingText: m.thinkingText,
           timestamp: m.timestamp,
@@ -1207,6 +1232,7 @@ export function useVsCodeApi() {
           id: string;
           type: string;
           text: string;
+          promptText?: string;
           html?: string;
           thinkingText?: string;
           timestamp: number;

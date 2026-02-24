@@ -168,6 +168,7 @@ export const RunFrame = memo(function RunFrame({
           {hasThinking && (
             <IOFrame
               title="Reasoning"
+              previewText="Detailed info"
               icon={<Brain className="size-4 shrink-0 text-muted-foreground" />}
               value={thinkingText}
               defaultOpen
