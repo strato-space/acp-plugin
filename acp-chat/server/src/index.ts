@@ -5,7 +5,19 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 
-import type { SessionNotification, ContentBlock } from "@agentclientprotocol/sdk";
+import type { SessionNotification } from "@agentclientprotocol/sdk";
+import {
+  isCodexAgent,
+  isFastAgent,
+  mapSessionUpdateToUiEvents,
+  normalizeReasoningLevel,
+  removeCodexReasoningOverride,
+  toContentBlocks,
+  toDisplayText,
+  upsertArg,
+  withModelReasoning,
+  type ReasoningLevel,
+} from "@strato-space/acp-runtime-shared";
 import { ACPClient } from "./acp/client";
 import {
   getAgent,
@@ -47,78 +59,6 @@ type IncomingMessage =
   | { type: "selectReasoning"; reasoningId?: string }
   | { type: "sendMessage"; text?: string; attachments?: Attachment[] };
 
-type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
-
-function normalizeReasoningLevel(value: string | undefined | null): ReasoningLevel {
-  const v = (value || "").trim().toLowerCase();
-  if (v === "minimal" || v === "low" || v === "medium" || v === "high") return v;
-  return "system";
-}
-
-function isCodexAgent(agent: { id: string; name: string }): boolean {
-  const id = agent.id.toLowerCase();
-  if (id === "codex") return true;
-  return agent.name.toLowerCase().includes("codex");
-}
-
-function isFastAgent(agent: { id: string; name: string }): boolean {
-  const id = agent.id.toLowerCase();
-  if (id === "fast-agent-acp") return true;
-  return agent.name.toLowerCase().includes("fast agent");
-}
-
-function withModelReasoning(modelId: string, reasoning: ReasoningLevel): string {
-  const raw = (modelId || "").trim();
-  if (!raw) return raw;
-  const q = raw.indexOf("?");
-  const base = q === -1 ? raw : raw.slice(0, q);
-  const query = q === -1 ? "" : raw.slice(q + 1);
-  const params = new URLSearchParams(query);
-  if (reasoning === "system") {
-    params.delete("reasoning");
-  } else {
-    params.set("reasoning", reasoning);
-  }
-  const rest = params.toString();
-  return rest ? `${base}?${rest}` : base;
-}
-
-function upsertArg(args: string[], key: string, value: string): string[] {
-  const out = [...args];
-  const eqPrefix = `${key}=`;
-  for (let i = 0; i < out.length; i++) {
-    const a = out[i];
-    if (a === key) {
-      if (i + 1 < out.length) out[i + 1] = value;
-      else out.push(value);
-      return out;
-    }
-    if (a.startsWith(eqPrefix)) {
-      out[i] = `${key}=${value}`;
-      return out;
-    }
-  }
-  out.push(key, value);
-  return out;
-}
-
-function removeCodexReasoningOverride(args: string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "-c" || a === "--config") {
-      const next = args[i + 1];
-      if (typeof next === "string" && next.startsWith("model_reasoning_effort=")) {
-        i += 1;
-        continue;
-      }
-    }
-    if (a.startsWith("model_reasoning_effort=")) continue;
-    out.push(a);
-  }
-  return out;
-}
-
 function send(ws: WebSocket, msg: Record<string, unknown>) {
   // Ignore sends on closed/closing sockets (e.g. late async ACP updates).
   if (ws.readyState !== 1) return false;
@@ -146,72 +86,8 @@ function getAuthToken(req: http.IncomingMessage): string | null {
   return null;
 }
 
-function toDisplayText(text: string, attachments?: Attachment[]): string {
-  const displayParts: string[] = [];
-
-  if (attachments && attachments.length > 0) {
-    for (const att of attachments) {
-      if (att.type === "image") {
-        displayParts.push(`[Image: ${att.name}]`);
-      } else if (att.type === "code") {
-        const lang = att.language || "";
-        const range = att.lineRange ? ` (lines ${att.lineRange[0]}-${att.lineRange[1]})` : "";
-        displayParts.push(
-          `\`\`\`${lang}\n// File: ${att.path || att.name}${range}\n${att.content}\n\`\`\``
-        );
-      } else {
-        displayParts.push(
-          `\`\`\`\n// File: ${att.path || att.name}\n${att.content}\n\`\`\``
-        );
-      }
-    }
-  }
-
-  if (text && text.trim()) displayParts.push(text);
-  return displayParts.join("\n\n");
-}
-
-function toContentBlocks(text: string, attachments?: Attachment[]): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-
-  if (attachments && attachments.length > 0) {
-    for (const att of attachments) {
-      if (att.type === "image") {
-        const base64Data = att.content.includes(",") ? att.content.split(",")[1] : att.content;
-        blocks.push({
-          type: "image",
-          data: base64Data,
-          mimeType: att.mimeType || "image/png",
-        });
-        continue;
-      }
-
-      if (att.type === "code") {
-        const lang = att.language || "";
-        const range = att.lineRange ? ` (lines ${att.lineRange[0]}-${att.lineRange[1]})` : "";
-        const codeBlock = `\`\`\`${lang}\n// File: ${att.path || att.name}${range}\n${att.content}\n\`\`\``;
-        blocks.push({ type: "text", text: codeBlock });
-        continue;
-      }
-
-      const fileBlock = `\`\`\`\n// File: ${att.path || att.name}\n${att.content}\n\`\`\``;
-      blocks.push({ type: "text", text: fileBlock });
-    }
-  }
-
-  if (text && text.trim()) blocks.push({ type: "text", text });
-  return blocks;
-}
-
 function mapConnectionState(state: ConnectionState): ConnectionState {
   return state;
-}
-
-function mapToolStatus(status: unknown): "running" | "completed" | "failed" {
-  const raw = typeof status === "string" ? status.toLowerCase() : "";
-  if (["completed", "complete", "done", "success", "succeeded"].includes(raw)) return "completed";
-  if (["failed", "error"].includes(raw)) return "failed";
-  return "running";
 }
 
 type WsContext = {
@@ -349,65 +225,11 @@ async function ensureSession(ctx: WsContext) {
 }
 
 function translateSessionUpdate(ctx: WsContext, n: SessionNotification) {
-  const update = n.update;
-
-  if (update.sessionUpdate === "agent_message_chunk") {
-    if (update.content.type === "text") {
-      ctx.streamingText += update.content.text;
-      send(ctx.ws, { type: "streamChunk", text: update.content.text });
+  for (const event of mapSessionUpdateToUiEvents(n.update)) {
+    if (event.type === "streamChunk" && typeof event.text === "string") {
+      ctx.streamingText += event.text;
     }
-    return;
-  }
-
-  if (update.sessionUpdate === "agent_thought_chunk") {
-    if (update.content.type === "text") {
-      send(ctx.ws, { type: "thinkingChunk", text: update.content.text });
-    }
-    return;
-  }
-
-  if (update.sessionUpdate === "tool_call") {
-    const meta = (update as unknown as { _meta?: unknown })._meta;
-    send(ctx.ws, {
-      type: "toolCallStart",
-      name: update.title,
-      toolCallId: update.toolCallId,
-      kind: update.kind,
-      meta,
-      rawInput: (update as unknown as { rawInput?: unknown }).rawInput,
-      rawOutput: (update as unknown as { rawOutput?: unknown }).rawOutput,
-    });
-    return;
-  }
-
-  if (update.sessionUpdate === "tool_call_update") {
-    send(ctx.ws, {
-      type: "toolCallComplete",
-      toolCallId: update.toolCallId,
-      title: update.title,
-      kind: update.kind,
-      content: update.content,
-      rawInput: update.rawInput,
-      rawOutput: update.rawOutput,
-      meta: (update as unknown as { _meta?: unknown })._meta,
-      status: mapToolStatus(update.status),
-    });
-    return;
-  }
-
-  if (update.sessionUpdate === "available_commands_update") {
-    send(ctx.ws, { type: "availableCommands", commands: update.availableCommands });
-    return;
-  }
-
-  if (update.sessionUpdate === "plan") {
-    send(ctx.ws, { type: "plan", plan: { entries: update.entries } });
-    return;
-  }
-
-  if (update.sessionUpdate === "current_mode_update") {
-    send(ctx.ws, { type: "modeUpdate", modeId: update.currentModeId });
-    return;
+    send(ctx.ws, event);
   }
 }
 

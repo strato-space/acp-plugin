@@ -13,6 +13,18 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
 } from "@agentclientprotocol/sdk";
+import {
+  isCodexAgent,
+  isFastAgent,
+  mapSessionUpdateToUiEvents,
+  normalizeReasoningLevel,
+  removeCodexReasoningOverride,
+  toContentBlocks,
+  toDisplayText,
+  upsertArg,
+  withModelReasoning,
+  type ReasoningLevel,
+} from "@strato-space/acp-runtime-shared";
 
 const PANEL_STORAGE_PREFIX = "acp.panels";
 const panelStorageKey = (panelKey: string, key: string) =>
@@ -91,78 +103,6 @@ const SELECTED_REASONING_STORAGE_KEY = "selectedReasoning";
 const SELECTED_REASONING_AGENT_STORAGE_KEY = "selectedReasoningAgent";
 const LAST_SELECTED_REASONING_STORAGE_KEY = "acp.lastSelectedReasoning";
 const SESSIONS_STORAGE_KEY = "sessions";
-
-type ReasoningLevel = "system" | "minimal" | "low" | "medium" | "high";
-
-function normalizeReasoningLevel(value: string | undefined | null): ReasoningLevel {
-  const v = (value || "").trim().toLowerCase();
-  if (v === "minimal" || v === "low" || v === "medium" || v === "high") return v;
-  return "system";
-}
-
-function isCodexAgent(agent: { id: string; name: string }): boolean {
-  const id = agent.id.toLowerCase();
-  if (id === "codex") return true;
-  return agent.name.toLowerCase().includes("codex");
-}
-
-function isFastAgent(agent: { id: string; name: string }): boolean {
-  const id = agent.id.toLowerCase();
-  if (id === "fast-agent-acp") return true;
-  return agent.name.toLowerCase().includes("fast agent");
-}
-
-function withModelReasoning(modelId: string, reasoning: ReasoningLevel): string {
-  const raw = (modelId || "").trim();
-  if (!raw) return raw;
-  const q = raw.indexOf("?");
-  const base = q === -1 ? raw : raw.slice(0, q);
-  const query = q === -1 ? "" : raw.slice(q + 1);
-  const params = new URLSearchParams(query);
-  if (reasoning === "system") {
-    params.delete("reasoning");
-  } else {
-    params.set("reasoning", reasoning);
-  }
-  const rest = params.toString();
-  return rest ? `${base}?${rest}` : base;
-}
-
-function upsertArg(args: string[], key: string, value: string): string[] {
-  const out = [...args];
-  const eqPrefix = `${key}=`;
-  for (let i = 0; i < out.length; i++) {
-    const a = out[i];
-    if (a === key) {
-      if (i + 1 < out.length) out[i + 1] = value;
-      else out.push(value);
-      return out;
-    }
-    if (a.startsWith(eqPrefix)) {
-      out[i] = `${key}=${value}`;
-      return out;
-    }
-  }
-  out.push(key, value);
-  return out;
-}
-
-function removeCodexReasoningOverride(args: string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "-c" || a === "--config") {
-      const next = args[i + 1];
-      if (typeof next === "string" && next.startsWith("model_reasoning_effort=")) {
-        i += 1;
-        continue;
-      }
-    }
-    if (a.startsWith("model_reasoning_effort=")) continue;
-    out.push(a);
-  }
-  return out;
-}
 
 // 각 패널의 독립적인 상태를 관리하는 컨텍스트
 interface PanelContext {
@@ -975,88 +915,11 @@ export class ChatPanelManager {
       update.sessionUpdate
     );
 
-    if (update.sessionUpdate === "agent_message_chunk") {
-      console.log(
-        `[Chat:${panelId}] Chunk content:`,
-        JSON.stringify(update.content)
-      );
-      if (update.content.type === "text") {
-        ctx.streamingText += update.content.text;
-        this.postMessageToPanel(panelId, {
-          type: "streamChunk",
-          text: update.content.text,
-        });
-      } else {
-        console.log(
-          `[Chat:${panelId}] Non-text chunk type:`,
-          update.content.type
-        );
+    for (const event of mapSessionUpdateToUiEvents(update)) {
+      if (event.type === "streamChunk" && typeof event.text === "string") {
+        ctx.streamingText += event.text;
       }
-    } else if (update.sessionUpdate === "agent_thought_chunk") {
-      // Thinking/reasoning 스트리밍 처리
-      if (update.content.type === "text") {
-        this.postMessageToPanel(panelId, {
-          type: "thinkingChunk",
-          text: update.content.text,
-        });
-      }
-    } else if (update.sessionUpdate === "tool_call") {
-      const meta = (update as unknown as { _meta?: unknown })._meta;
-      this.postMessageToPanel(panelId, {
-        type: "toolCallStart",
-        name: update.title,
-        toolCallId: update.toolCallId,
-        kind: update.kind,
-        meta,
-        // rawInput/rawOutput may be missing on tool_call for some agents
-        rawInput: (update as unknown as { rawInput?: unknown }).rawInput,
-        rawOutput: (update as unknown as { rawOutput?: unknown }).rawOutput,
-      });
-    } else if (update.sessionUpdate === "tool_call_update") {
-      // Be tolerant to agents that use non-standard status strings.
-      // ACP spec uses: in_progress | completed | failed.
-      const rawStatus = (update.status as unknown as string | undefined) ?? "";
-      const normalized = rawStatus.toLowerCase();
-
-      const mappedStatus =
-        normalized === "completed" ||
-        normalized === "complete" ||
-        normalized === "done" ||
-        normalized === "success" ||
-        normalized === "succeeded"
-          ? "completed"
-          : normalized === "failed" || normalized === "error"
-            ? "failed"
-            : "running"; // includes in_progress / running / unknown
-
-      this.postMessageToPanel(panelId, {
-        // Webview currently only understands toolCallStart + toolCallComplete.
-        // We use toolCallComplete as a generic tool update (may still be running).
-        type: "toolCallComplete",
-        toolCallId: update.toolCallId,
-        title: update.title,
-        kind: update.kind,
-        content: update.content,
-        rawInput: update.rawInput,
-        rawOutput: update.rawOutput,
-        meta: (update as unknown as { _meta?: unknown })._meta,
-        status: mappedStatus,
-      });
-    } else if (update.sessionUpdate === "current_mode_update") {
-      this.postMessageToPanel(panelId, {
-        type: "modeUpdate",
-        modeId: update.currentModeId,
-      });
-    } else if (update.sessionUpdate === "available_commands_update") {
-      this.postMessageToPanel(panelId, {
-        type: "availableCommands",
-        commands: update.availableCommands,
-      });
-    } else if (update.sessionUpdate === "plan") {
-      this.postMessageToPanel(panelId, {
-        type: "plan",
-        plan: { entries: update.entries },
-      });
+      this.postMessageToPanel(panelId, event);
     }
   }
 
@@ -1068,49 +931,8 @@ export class ChatPanelManager {
     const ctx = this.contexts.get(panelId);
     if (!ctx) return;
 
-    // ContentBlock 배열 생성 (에이전트에게 전송)
-    const contentBlocks: ContentBlock[] = [];
-    // 사용자 UI에 표시할 텍스트 (첨부파일 요약 포함)
-    const displayParts: string[] = [];
-
-    if (attachments && attachments.length > 0) {
-      for (const att of attachments) {
-        if (att.type === "image") {
-          // 이미지는 ContentBlock으로 전송 (에이전트가 실제로 볼 수 있음)
-          // data:image/png;base64,... 형식에서 base64 부분만 추출
-          const base64Data = att.content.includes(",")
-            ? att.content.split(",")[1]
-            : att.content;
-          contentBlocks.push({
-            type: "image",
-            data: base64Data,
-            mimeType: att.mimeType || "image/png",
-          });
-          displayParts.push(`[Image: ${att.name}]`);
-        } else if (att.type === "code") {
-          const lang = att.language || "";
-          const range = att.lineRange
-            ? ` (lines ${att.lineRange[0]}-${att.lineRange[1]})`
-            : "";
-          const codeBlock = `\`\`\`${lang}\n// File: ${att.path || att.name}${range}\n${att.content}\n\`\`\``;
-          contentBlocks.push({ type: "text", text: codeBlock });
-          displayParts.push(codeBlock);
-        } else {
-          // 일반 파일
-          const fileBlock = `\`\`\`\n// File: ${att.path || att.name}\n${att.content}\n\`\`\``;
-          contentBlocks.push({ type: "text", text: fileBlock });
-          displayParts.push(fileBlock);
-        }
-      }
-    }
-
-    // 메인 텍스트 추가
-    if (text) {
-      contentBlocks.push({ type: "text", text });
-      displayParts.push(text);
-    }
-
-    const displayMessage = displayParts.join("\n\n");
+    const contentBlocks = toContentBlocks(text, attachments) as ContentBlock[];
+    const displayMessage = toDisplayText(text, attachments);
     // 이미지 첨부파일만 추출해서 UI에 전달
     const imageAttachments =
       attachments?.filter((att) => att.type === "image") || [];

@@ -4,6 +4,15 @@ import { setCustomAgents, type AgentConfig } from "./acp/agents";
 import * as os from "os";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  getAgentServers,
+  getIncludeBuiltins,
+  isRecord,
+  mergeScopedExternalSettings,
+  parseJsonc,
+  toAgentConfigsFromServers,
+  type AgentServerSetting,
+} from "@strato-space/acp-runtime-shared";
 
 let chatPanelManager: ChatPanelManager | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -159,19 +168,6 @@ export function activate(context: vscode.ExtensionContext) {
   });
 }
 
-type AgentServerSetting = {
-  type?: string;
-  name?: string;
-  command?: string;
-  args?: unknown;
-  cwd?: string;
-  env?: Record<string, string>;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
 function expandVars(value: string): string {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   return value.replace(/\$\{([^}]+)\}/g, (_m, key: string) => {
@@ -233,11 +229,12 @@ function tryLoadExternalSettings(): ExternalSettingsLoadResult {
     });
   }
 
-  const globalServers: Record<string, AgentServerSetting> = {};
-  const workspaceServers: Record<string, AgentServerSetting> = {};
-  let includeGlobal: boolean | undefined;
-  let includeWorkspace: boolean | undefined;
-  const loadedPaths: string[] = [];
+  const scopedEntries: Array<{
+    scope: "global" | "workspace";
+    servers: Record<string, AgentServerSetting>;
+    includeBuiltins?: boolean;
+    sourcePath: string;
+  }> = [];
 
   for (const candidate of candidates) {
     const p = candidate.path;
@@ -247,180 +244,29 @@ function tryLoadExternalSettings(): ExternalSettingsLoadResult {
       const parsed = parseJsonc(raw);
       if (!isRecord(parsed)) continue;
 
-      const include = (() => {
-        const v = parsed["acp.includeBuiltInAgents"];
-        return typeof v === "boolean" ? v : undefined;
-      })();
-
-      const serversCandidate = (() => {
-        const merged: Record<string, AgentServerSetting> = {};
-
-        const merge = (v: unknown) => {
-          if (!isRecord(v)) return;
-          Object.assign(merged, v as Record<string, AgentServerSetting>);
-        };
-
-        // Supported alias: `acp.agents` has the same shape as `agent_servers`.
-        merge(parsed["acp.agents"]);
-
-        // Canonical Zed-compatible key at root.
-        merge(parsed["agent_servers"]);
-
-        return merged;
-      })();
-
-      if (Object.keys(serversCandidate).length === 0 && include === undefined) {
+      const include = getIncludeBuiltins(parsed);
+      const servers = getAgentServers(parsed);
+      if (Object.keys(servers).length === 0 && include === undefined) {
         continue;
       }
-      if (candidate.scope === "workspace") {
-        Object.assign(workspaceServers, serversCandidate);
-        if (include !== undefined) includeWorkspace = include;
-      } else {
-        Object.assign(globalServers, serversCandidate);
-        if (include !== undefined) includeGlobal = include;
-      }
-      loadedPaths.push(p);
+      scopedEntries.push({
+        scope: candidate.scope,
+        servers,
+        includeBuiltins: include,
+        sourcePath: p,
+      });
     } catch (err) {
       // Ignore invalid JSON / permission issues. Users can still rely on VS Code config.
       console.log("[ACP] Failed to load external settings:", p, err);
     }
   }
-
-  const mergedServers = {
-    ...globalServers,
-    ...workspaceServers,
-  };
-  const includeBuiltInAgents =
-    includeWorkspace !== undefined ? includeWorkspace : includeGlobal;
+  const merged = mergeScopedExternalSettings(scopedEntries);
 
   return {
-    servers: mergedServers,
-    includeBuiltInAgents,
-    sourcePath: loadedPaths.length > 0 ? loadedPaths.join(", ") : undefined,
+    servers: merged.servers,
+    includeBuiltInAgents: merged.includeBuiltins,
+    sourcePath: merged.sourcePath,
   };
-}
-
-function stripJsonComments(input: string): string {
-  let out = "";
-  let inString = false;
-  let quote = '"';
-  let escaping = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-
-  for (let i = 0; i < input.length; i++) {
-    const c = input[i];
-    const n = i + 1 < input.length ? input[i + 1] : "";
-
-    if (inLineComment) {
-      if (c === "\n") {
-        inLineComment = false;
-        out += c;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (c === "*" && n === "/") {
-        inBlockComment = false;
-        i++;
-      }
-      continue;
-    }
-
-    if (inString) {
-      out += c;
-      if (escaping) {
-        escaping = false;
-      } else if (c === "\\") {
-        escaping = true;
-      } else if (c === quote) {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (c === '"' || c === "'") {
-      inString = true;
-      quote = c;
-      out += c;
-      continue;
-    }
-
-    if (c === "/" && n === "/") {
-      inLineComment = true;
-      i++;
-      continue;
-    }
-    if (c === "/" && n === "*") {
-      inBlockComment = true;
-      i++;
-      continue;
-    }
-
-    out += c;
-  }
-
-  return out;
-}
-
-function removeTrailingCommas(input: string): string {
-  let out = "";
-  let inString = false;
-  let quote = '"';
-  let escaping = false;
-
-  for (let i = 0; i < input.length; i++) {
-    const c = input[i];
-
-    if (inString) {
-      out += c;
-      if (escaping) {
-        escaping = false;
-      } else if (c === "\\") {
-        escaping = true;
-      } else if (c === quote) {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (c === '"' || c === "'") {
-      inString = true;
-      quote = c;
-      out += c;
-      continue;
-    }
-
-    if (c === ",") {
-      // Skip comma if it's followed only by whitespace and then a closing bracket/brace.
-      let j = i + 1;
-      while (j < input.length && /\s/.test(input[j])) j++;
-      const next = j < input.length ? input[j] : "";
-      if (next === "}" || next === "]") {
-        continue;
-      }
-    }
-
-    out += c;
-  }
-
-  return out;
-}
-
-function parseJsonc(raw: string): unknown {
-  const noBom = raw.replace(/^\uFEFF/, "");
-  try {
-    return JSON.parse(noBom) as unknown;
-  } catch {
-    // VS Code/JSONC settings often contain comments and trailing commas.
-    const stripped = removeTrailingCommas(stripJsonComments(noBom));
-    try {
-      return JSON.parse(stripped) as unknown;
-    } catch {
-      return null;
-    }
-  }
 }
 
 function applyAgentSettings(): void {
@@ -506,52 +352,10 @@ function applyAgentSettings(): void {
     console.log("[ACP] applyAgentSettings: failed to log settings", err);
   }
 
-  const agents: AgentConfig[] = [];
-  for (const [id, raw] of Object.entries(servers)) {
-    if (!raw || typeof raw !== "object") continue;
-
-    const command = raw.command;
-    if (!command || typeof command !== "string") continue;
-
-    const rawArgs: string[] = Array.isArray(raw.args)
-      ? raw.args.filter((a): a is string => typeof a === "string")
-      : [];
-
-    const expandedArgs = rawArgs.map(expandVars);
-
-    const hasTransportAcp = (argv: string[]) => {
-      for (let i = 0; i < argv.length; i++) {
-        const a = argv[i];
-        if (a === "--transport") {
-          const next = argv[i + 1];
-          if (typeof next === "string" && next.toLowerCase() === "acp") return true;
-        }
-        const lower = a.toLowerCase();
-        if (lower.startsWith("--transport=")) {
-          const value = lower.slice("--transport=".length);
-          if (value === "acp") return true;
-        }
-      }
-      return false;
-    };
-
-    const ensureWatch = (argv: string[]) => {
-      // fast-agent supports `--watch` to reload AgentCard changes dynamically.
-      // Only apply it when the agent explicitly uses ACP transport.
-      if (!hasTransportAcp(argv)) return argv;
-      if (argv.includes("--watch")) return argv;
-      return [...argv, "--watch"];
-    };
-
-    agents.push({
-      id,
-      name: raw.name && typeof raw.name === "string" ? raw.name : id,
-      command: expandVars(command),
-      args: ensureWatch(expandedArgs),
-      cwd: raw.cwd ? expandVars(raw.cwd) : undefined,
-      env: raw.env,
-    });
-  }
+  const agents: AgentConfig[] = toAgentConfigsFromServers(servers, {
+    expandVars,
+    ensureWatchForTransportAcp: true,
+  });
 
   try {
     console.log(
