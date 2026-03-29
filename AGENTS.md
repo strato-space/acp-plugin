@@ -29,6 +29,8 @@
 - `npm run pack:acp-ui`: verify publish payload contents for `@strato-space/acp-ui`.
 - `npm run publish:acp-ui:dry-run`: validate the GitHub Packages publish lane without pushing a real package.
 - `npm run smoke:acp-ui:consumer`: pack `@strato-space/acp-ui`, install it into a temporary clean Vite consumer, and prove browser-side package consumption works outside the repo.
+- `npm run smoke:acp-ui:file-consumer`: prove the local `file:` prerelease lane installs and builds from a source checkout that starts without `dist/`.
+- `npm run test:acp-ui:release-version`: validate the semver-tag helper used by the ACP UI GitHub Packages workflow.
 
 Tip: In VS Code, use the "Run Extension" and "Extension Tests" launch configs
 (`.vscode/launch.json`).
@@ -124,6 +126,7 @@ code --uninstall-extension cosmosjeon.nexus-acp
   - workflow: `.github/workflows/publish-acp-ui-package.yml`
   - auth example: `packages/acp-ui/.npmrc.github-packages.example`
   - package artifact build is enforced by `packages/acp-ui/package.json` via `prepack`
+  - release tags `acp-ui-v<semver>` are the semver authority for the publish lane
 - Coverage: `npm run coverage` writes reports to `coverage/` (CI uploads + summarizes this).
 - E2E: Playwright tests live in `e2e/*.spec.ts` and run via `npm run test:e2e` (use
   `test:e2e:headed` / `test:e2e:debug` when debugging).

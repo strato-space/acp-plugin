@@ -26,6 +26,22 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
+      - name: Derive ACP UI release semver from tag
+        id: version
+        run: |
+          ACP_UI_VERSION="$(node ./scripts/acp-ui-release-version.mjs --tag "${GITHUB_REF_NAME}" --print-only)"
+          echo "ACP_UI_VERSION=${ACP_UI_VERSION}" >> "$GITHUB_ENV"
+          echo "acp_ui_version=${ACP_UI_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Sync package version to release tag
+        run: |
+          node ./scripts/acp-ui-release-version.mjs --tag "${GITHUB_REF_NAME}" --package packages/acp-ui/package.json
+
+      - name: Verify synced ACP UI package version
+        run: |
+          PACKAGE_VERSION="$(node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('packages/acp-ui/package.json','utf8')); process.stdout.write(pkg.version)")"
+          test "$PACKAGE_VERSION" = "$ACP_UI_VERSION"
+
       - name: Build ACP UI package
         working-directory: packages/acp-ui
         run: npm run build

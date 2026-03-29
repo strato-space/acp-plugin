@@ -19,13 +19,17 @@
     "dist"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "prepack": "npm run build",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && vite build",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/vscode.d.ts dist/vscode.d.ts && vite build",
     "watch": "vite build --watch"
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "dependencies": {
+    "zustand": "^5.0.4"
   },
   "repository": {
     "type": "git",

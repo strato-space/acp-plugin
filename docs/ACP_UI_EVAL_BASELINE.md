@@ -104,19 +104,22 @@ These checks validate the third ACP consumer:
 - `/agents` and `/agents/session/:id` mount the shared ACP UI package
 - the Copilot host bridge supplies ACP transport/persistence/route ports
 - the `/agents` surface stays ACP-only and does not fall back to MCP transport
+- the real `/agents` host route is validated with the actual auth-token -> ACP socket -> host-bridge lifecycle
 - the app and backend both build against the shared package/runtime contracts
-- browser acceptance uses the deterministic ACP harness route instead of the live runtime route
-- mobile acceptance must prove no horizontal overflow at iPhone XR width
+- deterministic browser acceptance still uses the ACP harness route for layout/shell checks, but it no longer stands in for the real `/agents` host runtime
+- mobile acceptance must prove no horizontal overflow at iPhone XR width on the real `/agents` host shell inside `MainLayout`
 - harness browser checks must fail on page errors and relevant failed requests/responses
 
 Commands from the `copilot` repo:
 
 ```bash
+cd app && npm run test:agents:runtime
 cd app && npm run build
 cd backend && npm run build
 cd app && npm run e2e:install
 cd app && npm run preview -- --host 127.0.0.1 --port 4173
 cd app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-harness
+cd app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-shell
 ```
 
 If port `4173` is already occupied, use the actual preview URL emitted by Vite and pass it via `PLAYWRIGHT_BASE_URL`.
@@ -125,6 +128,10 @@ Relevant sources:
 
 - `app/src/pages/AgentsOpsPage.tsx`
 - `app/src/pages/AgentsHarnessPage.tsx`
+- `app/__tests__/agents/agentsOpsRuntimeContract.test.tsx`
+- `app/__tests__/agents/agentsDeepLinkRestore.test.tsx`
+- `app/__tests__/agents/acpHostBridge.test.ts`
+- `app/e2e/agents-shell.spec.ts`
 - `app/src/services/acpHostBridge.ts`
 - `app/src/services/acpSocket.ts`
 - `backend/src/api/socket/acp.ts`
@@ -139,7 +146,7 @@ The baseline is considered healthy only when all three host rows are green:
 | --- | --- | --- | --- |
 | VS Code extension | `npm run test:webview:unit` | `npm run test:runtime:unit` + `npm test` | `npm run build:webview` |
 | browser `acp-chat` | `npm run test:webview:unit` | `npm run test:runtime:unit` | `npm --prefix acp-chat run build:web` |
-| `copilot /agents` | package contract from `@strato-space/acp-ui` | package/runtime contract from `@strato-space/acp-runtime-shared` | `cd app && npm run build` + `cd backend && npm run build` + `PLAYWRIGHT_BASE_URL=... npm run test:e2e:agents-harness` |
+| `copilot /agents` | package contract from `@strato-space/acp-ui` | `cd app && npm run test:agents:runtime` + package/runtime contract from `@strato-space/acp-runtime-shared` | `cd app && npm run build` + `cd backend && npm run build` + `PLAYWRIGHT_BASE_URL=... npm run test:e2e:agents-harness` + `PLAYWRIGHT_BASE_URL=... npm run test:e2e:agents-shell` |
 
 ## Canonical Quick Commands
 
@@ -159,6 +166,7 @@ cd backend && npm run build
 cd app && npm run e2e:install
 cd app && npm run preview -- --host 127.0.0.1 --port 4173
 cd app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-harness
+cd app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-shell
 ```
 
 ## Release Gate
@@ -168,10 +176,12 @@ For ACP UI extraction/package work, the minimal release gate is:
 1. `npm run test:acp-ui:baseline`
 2. `npm run verify:acp-ui:hosts`
 3. `npm run smoke:acp-ui:consumer`
-4. `cd ../copilot/app && npm run build`
-5. `cd ../copilot/backend && npm run build`
-6. `cd ../copilot/app && npm run e2e:install`
-7. `cd ../copilot/app && npm run preview -- --host 127.0.0.1 --port 4173`
-8. `cd ../copilot/app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-harness`
+4. `cd ../copilot/app && npm run test:agents:runtime`
+5. `cd ../copilot/app && npm run build`
+6. `cd ../copilot/backend && npm run build`
+7. `cd ../copilot/app && npm run e2e:install`
+8. `cd ../copilot/app && npm run preview -- --host 127.0.0.1 --port 4173`
+9. `cd ../copilot/app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-harness`
+10. `cd ../copilot/app && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:agents-shell`
 
 If one row is red, the ACP UI package is not considered verified across consumers.

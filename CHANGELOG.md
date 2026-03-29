@@ -10,6 +10,60 @@ Upstream attribution / prior art:
 - `omercnet/vscode-acp`
 - `zed` (agent_servers format + ACP agent CLIs)
 
+## 2026-03-30
+
+### PROBLEM SOLVED
+
+- **00:40** The ACP UI publish lane still trusted tag names operationally but did not enforce semver-tag authority in the GitHub Packages workflow, so a mistagged publish could drift away from the package version actually shipped.
+- **00:46** The local `file:` prerelease lane for `@strato-space/acp-ui` depended on prebuilt `dist/` being present, which broke clean cross-repo consumer installs and hid packaging regressions until a later integration step.
+- **00:53** ACP agent selection in the shared UI could accept `agentChanged` events for unavailable agents, letting hosts display a selection the backend had already rejected.
+- **01:00** Webview test prep reused stale `out/` artifacts, which meant old compiled bundles could mask real regressions in the current source tree.
+
+### FEATURE IMPLEMENTED
+
+- **00:43** Added semver-tag enforcement for the ACP UI publish workflow: `acp-ui-v<semver>` tags now derive and sync the package version before the GitHub Packages publish lane runs.
+- **00:48** Added a deterministic local `file:` consumer smoke and package `prepare` lifecycle so clean prerelease consumers no longer depend on prebuilt `dist/` artifacts.
+- **00:56** Added shared ACP agent-selection guards so unavailable-agent rejections keep the last valid selected agent instead of drifting the UI to a nonexistent state.
+- **01:03** Hardened the ACP UI verification lane with stale-artifact cleanup, release-version tests, and stronger clean-consumer TypeScript coverage.
+- **00:33** Released ACP Plugin `0.1.37`, installed the refreshed VSIX into the active Remote-SSH VS Code Server, restarted `acp-chat.service`, and revalidated both the local and public browser surfaces.
+
+### CHANGES
+
+- **00:43** Added semver release helper/test and wired the workflow to it:
+  - `.github/workflows/publish-acp-ui-package.yml`
+  - `scripts/acp-ui-release-version.mjs`
+  - `scripts/acp-ui-release-version.test.mjs`
+- **00:48** Added package/runtime prerelease fixes:
+  - `packages/acp-ui/package.json`
+  - `packages/acp-ui/README.md`
+  - `scripts/smoke-acp-ui-file-consumer.sh`
+  - `scripts/smoke-acp-ui-consumer.sh`
+- **00:56** Added shared ACP UI selection guard:
+  - `packages/acp-ui/src/hooks/agentSelection.ts`
+  - `packages/acp-ui/src/hooks/agentSelection.test.ts`
+  - `packages/acp-ui/src/hooks/useVsCodeApi.ts`
+- **01:03** Hardened root verification scripts and eval docs:
+  - `package.json`
+  - `docs/ACP_UI_EVAL_BASELINE.md`
+- **00:33** Release/deploy:
+  - `package.json` / `package-lock.json` -> `0.1.37`
+  - built `acp-plugin-0.1.37.vsix`
+  - installed `strato-space.acp-plugin@0.1.37` via VS Code Remote-SSH IPC socket
+  - restarted `acp-chat.service`
+- **01:12** Verification:
+  - `node ./scripts/acp-ui-release-version.mjs --tag acp-ui-v1.2.3 --print-only`
+  - `npm run test:acp-ui:release-version`
+  - `npm run smoke:acp-ui:consumer`
+  - `npm run smoke:acp-ui:file-consumer`
+  - `npm run test:webview:unit`
+  - `npm run test:runtime:unit`
+  - `npm run test`
+  - `npm run build:vsix`
+  - `npm --prefix acp-chat run build`
+  - `npm run verify:acp-ui:hosts`
+  - `curl -fsS http://127.0.0.1:8732/`
+  - `curl -I -fsS https://agents-dev.stratospace.fun/`
+
 ## 2026-03-29
 
 ### PROBLEM SOLVED

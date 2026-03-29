@@ -3,21 +3,26 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="$ROOT_DIR/packages/acp-ui"
-
-cd "$PKG_DIR"
-
-# Build through prepack so the tarball always reflects the current package artifact.
-TARBALL="$(npm pack | tail -n 1)"
 TMPDIR="$(mktemp -d)"
+PKG_COPY_DIR="$TMPDIR/acp-ui-source"
+CONSUMER_DIR="$TMPDIR/consumer"
+
 cleanup() {
   rm -rf "$TMPDIR"
-  rm -f "$PKG_DIR/$TARBALL"
 }
 trap cleanup EXIT
 
-cat >"$TMPDIR/package.json" <<EOF
+mkdir -p "$PKG_COPY_DIR" "$CONSUMER_DIR"
+rsync -a \
+  --exclude dist \
+  --exclude node_modules \
+  --exclude package-lock.json \
+  "$PKG_DIR/" "$PKG_COPY_DIR/"
+ln -s "$ROOT_DIR/node_modules" "$PKG_COPY_DIR/node_modules"
+
+cat >"$CONSUMER_DIR/package.json" <<EOF
 {
-  "name": "acp-ui-vite-smoke",
+  "name": "acp-ui-file-consumer-smoke",
   "private": true,
   "type": "module",
   "scripts": {
@@ -27,7 +32,7 @@ cat >"$TMPDIR/package.json" <<EOF
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "@strato-space/acp-ui": "file:$PKG_DIR/$TARBALL"
+    "@strato-space/acp-ui": "file:$PKG_COPY_DIR"
   },
   "devDependencies": {
     "@types/react": "^19.1.8",
@@ -38,7 +43,7 @@ cat >"$TMPDIR/package.json" <<EOF
 }
 EOF
 
-cat >"$TMPDIR/tsconfig.json" <<'EOF'
+cat >"$CONSUMER_DIR/tsconfig.json" <<'EOF'
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -54,7 +59,7 @@ cat >"$TMPDIR/tsconfig.json" <<'EOF'
 }
 EOF
 
-cat >"$TMPDIR/index.html" <<'EOF'
+cat >"$CONSUMER_DIR/index.html" <<'EOF'
 <!doctype html>
 <html>
   <body>
@@ -64,7 +69,7 @@ cat >"$TMPDIR/index.html" <<'EOF'
 </html>
 EOF
 
-cat >"$TMPDIR/main.tsx" <<'EOF'
+cat >"$CONSUMER_DIR/main.tsx" <<'EOF'
 import React from "react";
 import ReactDOM from "react-dom/client";
 import {
@@ -80,9 +85,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 EOF
 
-cd "$TMPDIR"
+cd "$CONSUMER_DIR"
 npm install --no-audit --no-fund
 npm run check-types
 npm run build
 
-echo "ACP UI clean consumer smoke passed in $TMPDIR"
+if [[ ! -d "$PKG_COPY_DIR/dist" ]]; then
+  echo "ACP UI file-consumer smoke failed: dist was not materialized by local file install" >&2
+  exit 1
+fi
+
+echo "ACP UI file consumer smoke passed in $CONSUMER_DIR"

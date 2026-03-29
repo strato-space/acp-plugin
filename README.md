@@ -209,16 +209,21 @@ GitHub Packages publish lane:
 
 - workflow: `.github/workflows/publish-acp-ui-package.yml`
 - local auth example: `packages/acp-ui/.npmrc.github-packages.example`
+- release tags: `acp-ui-v<semver>` (release tags are the semver authority for the publish lane)
 - package artifact is built automatically via `prepack` before `npm pack` / `npm publish`
 - local packaging checks:
   - `npm --prefix packages/acp-ui run build`
   - `npm run pack:acp-ui`
   - `npm run publish:acp-ui:dry-run`
+  - `npm run test:acp-ui:release-version`
   - `npm run smoke:acp-ui:consumer`
+  - `npm run smoke:acp-ui:file-consumer`
 
 Clean consumer smoke:
 
 - `npm run smoke:acp-ui:consumer` creates a real tarball, installs it into a temporary Vite + React app, imports `@strato-space/acp-ui`, imports `@strato-space/acp-ui/styles.css`, and proves the package builds in a clean browser consumer environment.
+- `npm run smoke:acp-ui:file-consumer` proves that a local `file:` prerelease consumer can install `@strato-space/acp-ui` from source and build successfully even when the package starts without `dist/`.
+- `npm run test:acp-ui:release-version` verifies the semver-tag helper used by the GitHub Packages workflow.
 
 Canonical eval baseline:
 
@@ -337,6 +342,20 @@ Shared webview UI unit tests:
 
 ```bash
 npm run test:webview:unit
+```
+
+Shared ACP runtime/settings tests:
+
+```bash
+npm run test:runtime:unit
+```
+
+Release/package lane checks:
+
+```bash
+npm run test:acp-ui:release-version
+npm run smoke:acp-ui:consumer
+npm run smoke:acp-ui:file-consumer
 ```
 
 Playwright smoke (agents-dev web):

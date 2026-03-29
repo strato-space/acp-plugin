@@ -5,6 +5,7 @@ import {
   sendAcpHostMessage,
   setAcpHostState,
 } from "../hostBridge";
+import { shouldApplyAgentChanged } from "./agentSelection";
 import type {
   ExtensionMessage,
   WebviewState,
@@ -865,6 +866,9 @@ export function useVsCodeInit() {
             const agentId = msg.agentId.trim();
             if (agentId) {
               const stateNow = useChatStore.getState();
+              if (!shouldApplyAgentChanged(agentId, stateNow.agents)) {
+                break;
+              }
               actions.setSelectedAgent(agentId);
 
               // Switching agents should not wipe existing sessions. Instead, start a new

@@ -88,6 +88,8 @@ The current cross-repo prerelease lane uses explicit local package consumption, 
 
 This lane is for build/test/integration before registry publish. It does not replace the external publish lane.
 
+For this local `file:` prerelease lane, the package materializes `dist/` via the package `prepare` lifecycle, so a clean consumer install does not depend on prebuilt artifacts already being present in the source checkout.
+
 ## GitHub Packages Publish Lane
 
 External publish is done through GitHub Packages:
@@ -95,6 +97,7 @@ External publish is done through GitHub Packages:
 - workflow: `.github/workflows/publish-acp-ui-package.yml`
 - registry: `https://npm.pkg.github.com`
 - package scope: `@strato-space`
+- release tags: `acp-ui-v<semver>` (for example `acp-ui-v0.2.0`)
 
 Local auth/bootstrap example:
 
@@ -110,10 +113,13 @@ npm --prefix packages/acp-ui run build
 npm run pack:acp-ui
 npm run publish:acp-ui:dry-run
 npm run smoke:acp-ui:consumer
+npm run smoke:acp-ui:file-consumer
 ```
 
 Notes:
 
 - `prepack` builds the package artifact automatically before `npm pack` and `npm publish`.
+- the GitHub Packages workflow derives the publish version from the `acp-ui-v<semver>` tag and syncs `packages/acp-ui/package.json` before publish; release tags are the semver authority for the publish lane.
 - `npm run smoke:acp-ui:consumer` proves the packed tarball installs and builds in a clean browser consumer environment.
+- `npm run smoke:acp-ui:file-consumer` proves the local `file:` prerelease lane installs and builds from a package source copy that starts without `dist/`.
 - The real registry publish remains an operator/release action and is not replaced by the dry-run lane.
