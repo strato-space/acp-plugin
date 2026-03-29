@@ -1,0 +1,37 @@
+name: publish-acp-ui-package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - acp-ui-v*
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build ACP UI package
+        working-directory: packages/acp-ui
+        run: npm run build
+
+      - name: Publish @strato-space/acp-ui
+        working-directory: packages/acp-ui
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { VsCodeApi } from "../vscode";
+import {
+  getAcpHostState,
+  getAcpRouteAdapter,
+  sendAcpHostMessage,
+  setAcpHostState,
+} from "../hostBridge";
 import type {
   ExtensionMessage,
   WebviewState,
@@ -239,30 +244,6 @@ function extractToolOutput(msg: ExtensionMessage): string | null {
 const STREAM_THROTTLE_MS = 50;
 const TOOL_THROTTLE_MS = 100;
 
-// Acquire VS Code API once at module level
-let vsCodeApi: VsCodeApi | null = null;
-
-function getVsCodeApi(): VsCodeApi {
-  if (!vsCodeApi) {
-    if (typeof acquireVsCodeApi === "undefined") {
-      // Mock for development outside VS Code
-      console.warn("[ACP] Running outside VS Code - using mock API");
-      vsCodeApi = {
-        postMessage: (msg: unknown) => console.log("[Mock] postMessage:", msg),
-        getState: <T>() => undefined as T | undefined,
-        setState: <T>(state: T) => state,
-      };
-    } else {
-      vsCodeApi = acquireVsCodeApi();
-      console.log("[ACP] VS Code API acquired successfully");
-    }
-  }
-  return vsCodeApi;
-}
-
-// Initialize immediately
-const vscode = getVsCodeApi();
-
 // Export a function to initialize message handling
 // This should be called once from App component
 export function useVsCodeInit() {
@@ -311,7 +292,7 @@ export function useVsCodeInit() {
 
   const postMessage = useCallback((message: unknown) => {
     console.log("[ACP] Sending message:", message);
-    vscode.postMessage(message);
+    sendAcpHostMessage(message);
   }, []);
 
   const saveState = useCallback(() => {
@@ -332,7 +313,7 @@ export function useVsCodeInit() {
       runFrameOpenByDefault: stateNow.runFrameOpenByDefault,
       toolListShowAllByDefault: stateNow.toolListShowAllByDefault,
     };
-    vscode.setState(state);
+    setAcpHostState(state);
   }, [
     connectionState,
     inputValue,
@@ -349,7 +330,7 @@ export function useVsCodeInit() {
   ]);
 
   const restoreState = useCallback((): WebviewState | undefined => {
-    const state = vscode.getState<WebviewState>();
+    const state = getAcpHostState<WebviewState>();
     if (state) {
       if (state.inputValue) {
         getActions().setInputValue(state.inputValue);
@@ -700,10 +681,11 @@ export function useVsCodeInit() {
               logicalToolCallId = aliased;
             } else {
               const state = useChatStore.getState();
+              const toolCallId = msg.toolCallId;
               const hasExact =
-                !!toolUpdatesRef.current.get(msg.toolCallId) ||
-                !!state.streaming.tools[msg.toolCallId] ||
-                state.messages.some((m) => !!m.tools?.[msg.toolCallId]);
+                !!toolUpdatesRef.current.get(toolCallId) ||
+                !!state.streaming.tools[toolCallId] ||
+                state.messages.some((m) => !!m.tools?.[toolCallId]);
 
               if (!hasExact) {
                 const title = msg.title || "Tool";
@@ -1152,7 +1134,7 @@ function generateSessionTitle(
 export function useVsCodeApi() {
   const postMessage = useCallback((message: unknown) => {
     console.log("[ACP] Sending message:", message);
-    vscode.postMessage(message);
+    sendAcpHostMessage(message);
   }, []);
 
   // Return stable function references
@@ -1204,12 +1186,13 @@ export function useVsCodeApi() {
       newChat: () => {
         // Create a new session locally before sending to extension
         const { addSession, selectedAgentId } = useChatStore.getState();
-        addSession({
+        const sessionId = addSession({
           title: "New Chat",
           agentId: selectedAgentId || "claude-code",
           timestamp: Date.now(),
           messages: [],
         });
+        getAcpRouteAdapter()?.setCurrentSessionId?.(sessionId);
         postMessage({ type: "newChat" });
       },
       clearChat: () => {
@@ -1222,6 +1205,7 @@ export function useVsCodeApi() {
       selectSession: (sessionId: string) => {
         const { selectSession } = useChatStore.getState();
         selectSession(sessionId);
+        getAcpRouteAdapter()?.setCurrentSessionId?.(sessionId);
       },
       saveSession: (session: {
         id: string;
@@ -1243,8 +1227,12 @@ export function useVsCodeApi() {
         postMessage({ type: "saveSession", session });
       },
       deleteSession: (sessionId: string) => {
-        const { deleteSession } = useChatStore.getState();
+        const { deleteSession, currentSessionId } = useChatStore.getState();
+        const wasActive = currentSessionId === sessionId;
         deleteSession(sessionId);
+        if (wasActive) {
+          getAcpRouteAdapter()?.setCurrentSessionId?.(null);
+        }
         postMessage({ type: "deleteSession", sessionId });
       },
     }),

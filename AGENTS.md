@@ -23,6 +23,12 @@
 - `npx vsce package --no-dependencies`: create a `.vsix` for manual install/testing.
 - `npm --prefix acp-chat ci && npm --prefix acp-chat run build`: build the standalone web UI + server bridge.
 - `npm run test:webview:unit`: run unit tests for shared UI logic (tool visibility and similar pure logic).
+- `npm run test:runtime:unit`: run shared ACP runtime/settings tests used by both ACP Plugin and Copilot ACP backend.
+- `npm run test:acp-ui:baseline`: run the canonical shared ACP UI baseline (`test:webview:unit` + `test:runtime:unit`).
+- `npm run verify:acp-ui:hosts`: verify package-consuming ACP hosts inside this repo (`build:webview` + `acp-chat` web build).
+- `npm run pack:acp-ui`: verify publish payload contents for `@strato-space/acp-ui`.
+- `npm run publish:acp-ui:dry-run`: validate the GitHub Packages publish lane without pushing a real package.
+- `npm run smoke:acp-ui:consumer`: pack `@strato-space/acp-ui`, install it into a temporary clean Vite consumer, and prove browser-side package consumption works outside the repo.
 
 Tip: In VS Code, use the "Run Extension" and "Extension Tests" launch configs
 (`.vscode/launch.json`).
@@ -112,6 +118,12 @@ code --uninstall-extension cosmosjeon.nexus-acp
 
 - Extension tests live in `src/test/*.test.ts` and run via `npm test` (VS Code test host).
 - Shared webview UI unit tests run via `npm run test:webview:unit`.
+- Shared ACP runtime/settings tests run via `npm run test:runtime:unit`.
+- Canonical ACP UI baseline lives in `docs/ACP_UI_EVAL_BASELINE.md` and starts with `npm run test:acp-ui:baseline`.
+- GitHub Packages lane artifacts/config:
+  - workflow: `.github/workflows/publish-acp-ui-package.yml`
+  - auth example: `packages/acp-ui/.npmrc.github-packages.example`
+  - package artifact build is enforced by `packages/acp-ui/package.json` via `prepack`
 - Coverage: `npm run coverage` writes reports to `coverage/` (CI uploads + summarizes this).
 - E2E: Playwright tests live in `e2e/*.spec.ts` and run via `npm run test:e2e` (use
   `test:e2e:headed` / `test:e2e:debug` when debugging).

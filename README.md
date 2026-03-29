@@ -180,6 +180,52 @@ This is a monorepo:
 - Shared React UI: `packages/acp-ui/` (used by the extension webview and `acp-chat`)
 - Web UI + server bridge: `acp-chat/`
 
+## Shared ACP UI Package
+
+`packages/acp-ui` is the reusable ACP UI/kernel package for ACP hosts.
+
+Current consumers:
+
+- ACP Plugin webview
+- browser `acp-chat`
+- `copilot /agents`
+
+Public package contract:
+
+- package artifact: `@strato-space/acp-ui`
+- stylesheet export: `@strato-space/acp-ui/styles.css`
+- host ports:
+  - `TransportAdapter`
+  - `HostPersistenceAdapter`
+  - `RouteAdapter`
+
+Current internal prerelease lane:
+
+- local cross-repo consumers can use a `file:` dependency to `packages/acp-ui`
+- this lane is for build/test integration before external registry publish
+- it does not replace the GitHub Packages publish lane
+
+GitHub Packages publish lane:
+
+- workflow: `.github/workflows/publish-acp-ui-package.yml`
+- local auth example: `packages/acp-ui/.npmrc.github-packages.example`
+- package artifact is built automatically via `prepack` before `npm pack` / `npm publish`
+- local packaging checks:
+  - `npm --prefix packages/acp-ui run build`
+  - `npm run pack:acp-ui`
+  - `npm run publish:acp-ui:dry-run`
+  - `npm run smoke:acp-ui:consumer`
+
+Clean consumer smoke:
+
+- `npm run smoke:acp-ui:consumer` creates a real tarball, installs it into a temporary Vite + React app, imports `@strato-space/acp-ui`, imports `@strato-space/acp-ui/styles.css`, and proves the package builds in a clean browser consumer environment.
+
+Canonical eval baseline:
+
+- `docs/ACP_UI_EVAL_BASELINE.md`
+- `npm run test:acp-ui:baseline`
+- `npm run verify:acp-ui:hosts`
+
 ## Installation
 
 ### Install From Marketplace

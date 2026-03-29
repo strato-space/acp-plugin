@@ -141,6 +141,7 @@ export interface ExtensionMessage {
   rawOutput?: unknown;
   meta?: unknown;
   status?: string;
+  stopReason?: string;
   attachments?: Attachment[]; // 이미지 등 첨부파일
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   files?: any[]; // filesAttached용

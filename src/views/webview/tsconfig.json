@@ -15,11 +15,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["../../../packages/acp-ui/src/*"]
-    }
+    "baseUrl": "."
   },
-  "include": ["src", "../../../packages/acp-ui/src"],
-  "exclude": ["../../../packages/acp-ui/src/**/*.test.ts"]
+  "include": ["src"]
 }

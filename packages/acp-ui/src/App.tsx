@@ -1,12 +1,12 @@
-import { useChatStore } from "@/store";
 import { useVsCodeInit } from "@/hooks/useVsCodeApi";
+import { useChatStore } from "@/store";
 import { WelcomeView } from "@/components/layout/WelcomeView";
 import { ChatContainer } from "@/components/chat/ChatContainer";
 import { ChatInput } from "@/components/input/ChatInput";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { cn } from "@/lib/utils";
 
-export function App() {
+export function AcpUiApp() {
   // Initialize VS Code API message handling
   useVsCodeInit();
 
@@ -95,3 +95,5 @@ export function App() {
     </div>
   );
 }
+
+export const App = AcpUiApp;

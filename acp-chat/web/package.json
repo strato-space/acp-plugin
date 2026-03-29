@@ -9,6 +9,7 @@
     "watch": "vite build --watch"
   },
   "dependencies": {
+    "@strato-space/acp-ui": "file:../../packages/acp-ui",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-use-controllable-state": "^1.2.2",

@@ -2,7 +2,22 @@
   "name": "@strato-space/acp-runtime-shared",
   "version": "0.1.0",
   "private": true,
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.js"
+    },
+    "./acp_client": {
+      "types": "./acp_client.d.ts",
+      "import": "./acp_client.js",
+      "require": "./acp_client.js"
+    }
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.12.0"
+  },
   "license": "Apache-2.0"
 }

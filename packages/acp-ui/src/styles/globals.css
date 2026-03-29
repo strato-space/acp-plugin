@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* VS Code theme mapping (webview inherits --vscode-* CSS variables) */
-:root {
+#acp-root {
   --radius: 0.625rem;
 
   --background: var(--vscode-editor-background, #1e1e1e);
@@ -49,15 +49,16 @@
 }
 
 /* Base styles */
-* {
+#acp-root,
+#acp-root * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   border-color: var(--border);
 }
 
-body {
-  height: 100vh;
+#acp-root {
+  height: 100%;
   background: var(--background);
   color: var(--foreground);
   font-family:
@@ -68,24 +69,18 @@ body {
   overflow: hidden;
 }
 
-#root {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
 /* Focus visible for accessibility - exclude textarea */
-*:focus-visible:not(textarea) {
+#acp-root *:focus-visible:not(textarea) {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 
-textarea:focus-visible {
+#acp-root textarea:focus-visible {
   outline: none;
 }
 
 /* Screen reader only */
-.sr-only {
+#acp-root .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -98,26 +93,26 @@ textarea:focus-visible {
 }
 
 /* Scrollbar styling - minimal */
-::-webkit-scrollbar {
+#acp-root ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+#acp-root ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+#acp-root ::-webkit-scrollbar-thumb {
   background: var(--vscode-scrollbarSlider-background, #4c4c4c);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+#acp-root ::-webkit-scrollbar-thumb:hover {
   background: var(--vscode-scrollbarSlider-hoverBackground, #5a5a5a);
 }
 
 /* Thinking animation */
-.thinking::after {
+#acp-root .thinking::after {
   content: "";
   animation: dots 1.5s steps(4, end) infinite;
 }
@@ -140,44 +135,44 @@ textarea:focus-visible {
 }
 
 /* ANSI styles for terminal output */
-.ansi-bold {
+#acp-root .ansi-bold {
   font-weight: bold;
 }
-.ansi-dim {
+#acp-root .ansi-dim {
   opacity: 0.7;
 }
-.ansi-italic {
+#acp-root .ansi-italic {
   font-style: italic;
 }
-.ansi-underline {
+#acp-root .ansi-underline {
   text-decoration: underline;
 }
 
 /* Syntax highlighting */
-.hljs {
+#acp-root .hljs {
   background: transparent !important;
   padding: 0 !important;
 }
 
 /* Prose styles - markdown content */
-.prose {
+#acp-root .prose {
   line-height: 1.55;
 }
 
-.prose p {
+#acp-root .prose p {
   margin-top: 0;
   margin-bottom: 0;
 }
 
-.prose p:first-child {
+#acp-root .prose p:first-child {
   margin-top: 0;
 }
 
-.prose p:last-child {
+#acp-root .prose p:last-child {
   margin-bottom: 0;
 }
 
-.prose code {
+#acp-root .prose code {
   background: var(--muted);
   padding: 0.125em 0.375em;
   border-radius: 0.25rem;
@@ -186,7 +181,7 @@ textarea:focus-visible {
   border: 1px solid var(--border);
 }
 
-.prose pre {
+#acp-root .prose pre {
   background: var(--vscode-textPreformat-background, var(--muted));
   color: var(--vscode-textPreformat-foreground, var(--foreground));
   padding: 1rem;
@@ -195,57 +190,57 @@ textarea:focus-visible {
   margin: 0;
 }
 
-.prose pre code {
+#acp-root .prose pre code {
   background: transparent;
   padding: 0;
   border: none;
   font-weight: normal;
 }
 
-.prose ul,
-.prose ol {
+#acp-root .prose ul,
+#acp-root .prose ol {
   padding-left: 1.5rem;
   margin: 0;
 }
 
-.prose li {
+#acp-root .prose li {
   margin: 0;
 }
 
-.prose ul {
+#acp-root .prose ul {
   list-style-type: disc;
 }
 
-.prose ol {
+#acp-root .prose ol {
   list-style-type: decimal;
 }
 
-.prose a {
+#acp-root .prose a {
   color: var(--vscode-textLink-foreground, var(--primary));
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 
-.prose blockquote {
+#acp-root .prose blockquote {
   border-left: 2px solid var(--border);
   padding-left: 1.5rem;
   font-style: italic;
 }
 
-.prose h1,
-.prose h2,
-.prose h3,
-.prose h4,
-.prose h5,
-.prose h6 {
+#acp-root .prose h1,
+#acp-root .prose h2,
+#acp-root .prose h3,
+#acp-root .prose h4,
+#acp-root .prose h5,
+#acp-root .prose h6 {
   font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
 }
 
-.prose h1:first-child,
-.prose h2:first-child,
-.prose h3:first-child {
+#acp-root .prose h1:first-child,
+#acp-root .prose h2:first-child,
+#acp-root .prose h3:first-child {
   margin-top: 0;
 }
 

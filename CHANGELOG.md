@@ -10,6 +10,56 @@ Upstream attribution / prior art:
 - `omercnet/vscode-acp`
 - `zed` (agent_servers format + ACP agent CLIs)
 
+## 2026-03-29
+
+### PROBLEM SOLVED
+
+- **10:55** ACP UI still behaved like a source-internal implementation detail of ACP Plugin: the shared React tree existed in `packages/acp-ui`, but there was no stable package artifact or public host-bridge contract for other ACP hosts.
+- **11:35** Browser ACP surfaces drifted operationally: `acp-chat` and the VS Code webview consumed the same source tree, yet there was no deterministic harness lane proving the shared UI behaved the same across ACP Plugin, browser `acp-chat`, and `copilot /agents`.
+- **12:45** ACP UI package publish checks relied on a prebuilt `dist/` directory, so `npm pack --dry-run` could report a valid lane while a fresh package artifact was not actually being assembled.
+- **12:50** The publish/install lane had dry-run coverage and local host builds, but no checked-in clean-consumer smoke proving that a packed `@strato-space/acp-ui` artifact installs and bundles in an external browser app.
+
+### FEATURE IMPLEMENTED
+
+- **11:15** Materialized `@strato-space/acp-ui` as a reusable ACP UI/kernel package with typed exports, host-bridge primitives, and harness helpers, then kept ACP Plugin webview and browser `acp-chat` on package consumption instead of private source coupling.
+- **11:40** Added deterministic ACP harness support for browser consumers so the same shared UI/kernel can be verified in `acp-chat` and in `copilot /agents` without a live ACP runtime.
+- **12:55** Added package-level `prepack` in `packages/acp-ui` so `npm pack` and `npm publish` always build the artifact deterministically before packaging.
+- **12:58** Added `npm run smoke:acp-ui:consumer`, a clean-consumer smoke that creates a real tarball, installs it into a temporary Vite + React app, imports the ACP UI package and stylesheet, and proves browser-side bundling works outside the monorepo.
+- **13:00** Folded deterministic browser harness checks and clean-consumer package smoke into the canonical ACP UI eval baseline and release docs.
+
+### CHANGES
+
+- **11:15** Added package artifacts and public contract files:
+  - `packages/acp-ui/package.json`
+  - `packages/acp-ui/src/index.ts`
+  - `packages/acp-ui/src/hostBridge.ts`
+  - `packages/acp-ui/src/styles.ts`
+  - `packages/acp-ui/tsconfig.build.json`
+  - `packages/acp-ui/vite.config.ts`
+  - `packages/acp-ui/postcss.config.js`
+  - `packages/acp-ui/tailwind.config.ts`
+- **11:20** Switched ACP Plugin and browser `acp-chat` consumers to package-oriented entrypoints and host adapters:
+  - `src/views/webview/src/main.tsx`
+  - `src/views/webview/tsconfig.json`
+  - `src/views/webview/vite.config.ts`
+  - `acp-chat/web/src/main.tsx`
+  - `acp-chat/web/package.json`
+  - `acp-chat/web/tsconfig.json`
+  - `acp-chat/web/vite.config.ts`
+  - `acp-chat/package.json`
+- **11:40** Added harness/runtime verification surfaces:
+  - `packages/acp-ui/src/harness.ts`
+  - `packages/acp-ui/src/hostBridge.test.ts`
+  - `docs/ACP_UI_EVAL_BASELINE.md`
+- **12:55** Added `prepack` to `packages/acp-ui/package.json`.
+- **12:58** Added `scripts/smoke-acp-ui-consumer.sh` and root script `npm run smoke:acp-ui:consumer`.
+- **13:00** Updated package/release documentation in:
+  - `README.md`
+  - `AGENTS.md`
+  - `packages/acp-ui/README.md`
+  - `docs/ACP_UI_EVAL_BASELINE.md`
+- **13:10** Bumped release version from `0.1.35` to `0.1.36` in `package.json` / `package-lock.json` and produced `acp-plugin-0.1.36.vsix`.
+
 ## 2026-02-12
 
 ### PROBLEM SOLVED

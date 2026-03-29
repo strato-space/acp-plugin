@@ -10,12 +10,7 @@ export default defineConfig({
     sourcemap: false
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "../../packages/acp-ui/src"),
-    },
-    // Prevent duplicate React copies when importing source files from outside
-    // this workspace (e.g. ../../packages/acp-ui). Without this, hooks can
-    // crash at runtime with: "Cannot read properties of null (reading 'useCallback')".
+    // Prevent duplicate React copies when importing the shared ACP UI package.
     dedupe: ["react", "react-dom"],
   },
 });
